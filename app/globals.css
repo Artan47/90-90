@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/*
+ * Aucune police distante : uniquement la pile système. C'est une exigence de
+ * confidentialité (aucune requête vers un domaine tiers), pas une préférence.
+ */
+@theme {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --color-ink: #0b1220;
+  --color-ink-soft: #1a2434;
+  --color-paper: #f6f7fb;
+
+  --color-ok: #16a34a;
+  --color-ok-soft: #dcfce7;
+  --color-warn: #ea580c;
+  --color-warn-soft: #ffedd5;
+  --color-bad: #dc2626;
+  --color-bad-soft: #fee2e2;
+  --color-over: #7f1d1d;
+}
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --border: #e4e7ee;
+  --text: #0b1220;
+  --text-muted: #5b6577;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #141c2b;
+    --border: #253044;
+    --text: #f2f5fa;
+    --text-muted: #94a1b8;
+  }
+}
+
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* Encoches et barre d'accueil iOS. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0
+    env(safe-area-inset-left);
+  overscroll-behavior-y: none;
+}
+
+/* Empêche iOS de zoomer au focus d'un champ (taille < 16px). */
+input,
+select,
+textarea,
+button {
+  font-family: inherit;
+  font-size: 16px;
+}
+
+@utility surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+@utility muted {
+  color: var(--text-muted);
+}
+
+/* Chiffres alignés pour les compteurs. */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+.ring-track {
+  stroke: var(--border);
+}
+
+@keyframes pop {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.pop {
+  animation: pop 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop { animation: none; }
+  * { transition: none !important; }
+}

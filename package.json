@@ -1,0 +1,35 @@
+{
+  "name": "sa-dite",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Llogaritës i rregullit 90/180 për zonën Schengen — PWA offline, pa server.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && node scripts/build-sw.mjs",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run && npm run test:tz",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:tz": "TZ=Pacific/Kiritimati vitest run && TZ=Pacific/Niue vitest run && TZ=UTC vitest run",
+    "icons": "node scripts/make-icons.mjs",
+    "test:e2e": "node scripts/e2e-check.mjs",
+    "verify": "npm run typecheck && npm test && npm run test:coverage && npm run build && npm run test:e2e"
+  },
+  "dependencies": {
+    "next": "15.5.4",
+    "react": "19.1.1",
+    "react-dom": "19.1.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.1.13",
+    "@types/node": "22.18.1",
+    "@types/react": "19.1.13",
+    "@types/react-dom": "19.1.9",
+    "@vitest/coverage-v8": "3.2.4",
+    "playwright": "^1.55.0",
+    "tailwindcss": "4.1.13",
+    "typescript": "5.9.2",
+    "vitest": "3.2.4"
+  }
+}
