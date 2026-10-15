@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useStore, useT } from "@/components/Store";
 import { StayForm, type StayDraft } from "@/components/StayForm";
 import { Badge, Button, Card, PageTitle } from "@/components/ui";
+import { Confirm } from "@/components/Confirm";
 import { getCountry, countsEver } from "@/lib/schengen-membership";
 import { countedDays, stayDays, validate } from "@/lib/schengen";
 import { compareDates, formatDate } from "@/lib/date";
@@ -14,9 +15,15 @@ export default function StaysPage() {
   const { stays, today, addStay, updateStay, removeStay, ready, t } = useStore();
   const [editing, setEditing] = useState<Stay | null>(null);
   const [adding, setAdding] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState<Stay | null>(null);
 
-  const sorted = useMemo(
-    () => [...stays].sort((a, b) => compareDates(b.entry, a.entry)),
+  const byDateDesc = (a: Stay, b: Stay) => compareDates(b.entry, a.entry);
+  const real = useMemo(
+    () => stays.filter((s) => !s.planned).sort(byDateDesc),
+    [stays],
+  );
+  const planned = useMemo(
+    () => stays.filter((s) => s.planned).sort(byDateDesc),
     [stays],
   );
   const issues = useMemo(() => validate(stays, today), [stays, today]);
@@ -59,27 +66,64 @@ export default function StaysPage() {
         <p className="tnum text-sm muted">{fill(t.stays.total, { n: totalDays })}</p>
       ) : null}
 
-      {sorted.length === 0 ? (
+      {real.length === 0 && planned.length === 0 ? (
         <Card>
           <p className="text-sm muted">{t.stays.empty}</p>
         </Card>
-      ) : (
-        <ul className="space-y-3">
-          {sorted.map((stay) => (
-            <StayRow
-              key={stay.id}
-              stay={stay}
-              today={today}
-              issues={issues.filter((i) => i.stayId === stay.id)}
-              onEdit={() => setEditing(stay)}
-              onDelete={() => {
-                if (window.confirm(t.stays.confirmDelete)) removeStay(stay.id);
-              }}
-              onMarkExit={() => updateStay(stay.id, { exit: today })}
-            />
-          ))}
-        </ul>
-      )}
+      ) : null}
+
+      {real.length > 0 ? (
+        <>
+          <h2 className="pt-1 text-sm font-semibold muted">{t.stays.sectionReal}</h2>
+          <ul className="space-y-3">
+            {real.map((stay) => (
+              <StayRow
+                key={stay.id}
+                stay={stay}
+                today={today}
+                issues={issues.filter((i) => i.stayId === stay.id)}
+                onEdit={() => setEditing(stay)}
+                onDelete={() => setPendingDelete(stay)}
+                onMarkExit={() => updateStay(stay.id, { exit: today })}
+              />
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      {planned.length > 0 ? (
+        <>
+          <h2 className="pt-2 text-sm font-semibold muted">{t.stays.sectionPlanned}</h2>
+          <ul className="space-y-3">
+            {planned.map((stay) => (
+              <StayRow
+                key={stay.id}
+                stay={stay}
+                today={today}
+                issues={issues.filter((i) => i.stayId === stay.id)}
+                onEdit={() => setEditing(stay)}
+                onDelete={() => setPendingDelete(stay)}
+                onMarkExit={() => updateStay(stay.id, { exit: today })}
+              />
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      {pendingDelete ? (
+        <Confirm
+          title={t.stays.deleteTitle}
+          body={fill(t.stays.deleteBody, {
+            from: formatDate(pendingDelete.entry),
+            to: pendingDelete.exit ? formatDate(pendingDelete.exit) : "…",
+          })}
+          onConfirm={() => {
+            removeStay(pendingDelete.id);
+            setPendingDelete(null);
+          }}
+          onCancel={() => setPendingDelete(null)}
+        />
+      ) : null}
     </div>
   );
 }

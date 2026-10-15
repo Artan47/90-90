@@ -440,6 +440,104 @@ function findFirstOverflow(
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Voyages planifiés
+// ──────────────────────────────────────────────────────────────────────
+
+export interface PlannedTrip {
+  stay: Stay;
+  entry: IsoDate;
+  exit: IsoDate;
+  days: number;
+  ok: boolean;
+  firstOverflowDate?: IsoDate;
+  daysOver?: number;
+}
+
+export interface PlannedOutlook {
+  trips: PlannedTrip[];
+  /** Au moins un voyage planifié dépasse le quota. */
+  anyOverflow: boolean;
+  /** Premier jour d'infraction, tous voyages planifiés confondus. */
+  firstOverflowDate: IsoDate | null;
+  daysOver: number;
+  /** Dernier jour couvert par les voyages planifiés. */
+  lastExit: IsoDate | null;
+  /** Jours restants au dernier jour planifié, une fois tout pris en compte. */
+  remainingAfter: number;
+}
+
+/**
+ * Évalue les voyages planifiés EN BLOC, et non un par un.
+ *
+ * Chaque voyage est jugé dans le contexte de l'historique réel ET des autres
+ * voyages planifiés : deux voyages qui passent isolément peuvent très bien
+ * dépasser le quota une fois mis bout à bout. C'est le calcul unique qui
+ * alimente le résumé de l'écran d'accueil.
+ */
+export function plannedOutlook(stays: Stay[], today: IsoDate): PlannedOutlook {
+  const planned = stays
+    .filter((s) => s.planned && isIsoDate(s.entry) && s.exit && isIsoDate(s.exit))
+    .sort((a, b) => (isBefore(a.entry, b.entry) ? -1 : 1));
+
+  const empty: PlannedOutlook = {
+    trips: [],
+    anyOverflow: false,
+    firstOverflowDate: null,
+    daysOver: 0,
+    lastExit: null,
+    remainingAfter: remainingOn(stays, today),
+  };
+  if (planned.length === 0) return empty;
+
+  // Projection complète : réel + TOUS les voyages planifiés.
+  const projection = materializePlanned(stays);
+
+  const trips: PlannedTrip[] = [];
+  let firstOverflowDate: IsoDate | null = null;
+  let daysOver = 0;
+  let lastExit: IsoDate | null = null;
+
+  for (const stay of planned) {
+    const exit = stay.exit as IsoDate;
+    let tripFirst: IsoDate | undefined;
+    let tripOver = 0;
+
+    for (const day of eachDay(stay.entry, exit)) {
+      const excess = usedOn(projection, day) - MAX_DAYS;
+      if (excess > 0) {
+        if (!tripFirst) tripFirst = day;
+        tripOver = Math.max(tripOver, excess);
+      }
+    }
+
+    const trip: PlannedTrip = {
+      stay,
+      entry: stay.entry,
+      exit,
+      days: inclusiveDays(stay.entry, exit),
+      ok: tripFirst === undefined,
+    };
+    if (tripFirst) {
+      trip.firstOverflowDate = tripFirst;
+      trip.daysOver = tripOver;
+      if (!firstOverflowDate) firstOverflowDate = tripFirst;
+      daysOver = Math.max(daysOver, tripOver);
+    }
+    trips.push(trip);
+    lastExit = lastExit === null ? exit : maxDate(lastExit, exit);
+  }
+
+  return {
+    trips,
+    anyOverflow: firstOverflowDate !== null,
+    firstOverflowDate,
+    daysOver,
+    lastExit,
+    remainingAfter: remainingOn(projection, lastExit ?? today),
+  };
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Vue d'ensemble (écran d'accueil)
 // ──────────────────────────────────────────────────────────────────────
 
@@ -461,6 +559,10 @@ export interface Status {
   /** Premier jour où les 90 jours sont de nouveau disponibles. */
   fullReset: IsoDate;
   issues: Issue[];
+  /** Résumé de l'historique réel. */
+  summary: { stayCount: number; totalDays: number };
+  /** Projection incluant les voyages planifiés. */
+  planned: PlannedOutlook;
 }
 
 /** Tout ce dont l'écran d'accueil a besoin, en un seul passage. */
@@ -481,5 +583,19 @@ export function statusOn(stays: Stay[], today: IsoDate): Status {
     earliestReentry: earliestReentry(stays, today),
     fullReset: fullResetDate(stays, today),
     issues: validate(stays, today),
+    summary: summarize(stays, today),
+    planned: plannedOutlook(stays, today),
+  };
+}
+
+/** Nombre de séjours réels et total de jours saisis. */
+export function summarize(
+  stays: Stay[],
+  today: IsoDate,
+): { stayCount: number; totalDays: number } {
+  const real = stays.filter((s) => !s.planned && isIsoDate(s.entry));
+  return {
+    stayCount: real.length,
+    totalDays: real.reduce((n, s) => n + stayDays(s, today), 0),
   };
 }

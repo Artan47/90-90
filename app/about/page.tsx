@@ -15,7 +15,7 @@ export default function AboutPage() {
   const members = COUNTRIES.filter((c) => c.since !== null);
   // On ne montre que les cas contre-intuitifs : ceux que l'on croit à tort
   // dans Schengen. Les pays tiers évidents n'ont pas besoin d'explication.
-  const excluded = COUNTRIES.filter((c) => ["CY", "IE", "GB"].includes(c.code));
+  const excluded = COUNTRIES.filter((c) => ["CY", "IE"].includes(c.code));
 
   return (
     <div className="space-y-4">

@@ -151,7 +151,95 @@ const offlineHome = await page.locator("main span").first().innerText();
 check("hors ligne : le calcul fonctionne toujours", offlineHome.trim() === "40", `affiché « ${offlineHome.trim()} »`);
 await context.setOffline(false);
 
+// ── Suppression d'un séjour (le bug window.confirm) ───────────────────
+// On neutralise les boîtes natives : si le code en dépendait encore, la
+// suppression échouerait ici exactement comme dans une iframe sandboxée.
+await page.addInitScript(() => {
+  window.confirm = () => { throw new Error("window.confirm est interdit"); };
+  window.alert = () => { throw new Error("window.alert est interdit"); };
+});
+await page.goto(`${BASE}/stays/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+const rowsBefore = await page.locator("main li").count();
+check("liste des séjours affichée", rowsBefore === 4, `${rowsBefore} lignes`);
+
+await page.locator("main li").first().getByText("Fshij").click();
+await page.waitForTimeout(400);
+check("une confirmation intégrée s'ouvre",
+  await page.getByRole("dialog").isVisible());
+
+await page.getByRole("button", { name: /Jo, anulo/ }).click();
+await page.waitForTimeout(400);
+check("annuler ne supprime rien", (await page.locator("main li").count()) === 4);
+
+await page.locator("main li").first().getByText("Fshij").click();
+await page.waitForTimeout(300);
+await page.getByRole("button", { name: /Po, fshije/ }).click();
+await page.waitForTimeout(500);
+const rowsAfter = await page.locator("main li").count();
+check("SUPPRESSION EFFECTIVE", rowsAfter === 3, `${rowsBefore} → ${rowsAfter} lignes`);
+
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+check("la suppression est persistée", (await page.locator("main li").count()) === 3);
+
+// ── Formulaire simplifié ──────────────────────────────────────────────
+await page.getByText("Shto qëndrim").click();
+await page.waitForTimeout(400);
+const form = await page.locator("main").innerText();
+check("plus de champ Note", !/Shënim/.test(form));
+check("plus d'interrupteur Visa D", !/Vizë D/.test(form));
+
+const options = await page.locator("select").first().locator("option").allInnerTexts();
+const nonSchengen = options.filter((o) => /Kosovë|Maqedoni|Shqipëri|Serbi|Turqi|Mbretëria|SHBA|tjetër/.test(o));
+check("pays d'origine limités au Kosovo, Macédoine, Albanie",
+  nonSchengen.length === 3, nonSchengen.map((o) => o.trim()).join(" / "));
+check("les 29 États Schengen sont toujours là", options.length === 34, `${options.length} entrées`);
+
+// ── Planification consolidée et résumé sur l'accueil ──────────────────
+await page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.stays = [
+    { id: "r1", entry: "2026-06-01", exit: "2026-08-24", country: "DE" },       // 85 j
+    { id: "p1", entry: "2026-09-01", exit: "2026-09-10", country: "FR", planned: true },
+  ];
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForTimeout(700);
+const home = await page.locator("body").innerText();
+check("accueil : résumé des séjours", /1 qëndrime të regjistruara · 85 ditë/.test(home));
+check("accueil : voyage planifié listé", /01\.09\.2026 → 10\.09\.2026 \(10 ditë\)/.test(home));
+check("accueil : dépassement détecté au bon jour",
+  /06\.09\.2026/.test(home) && /5 ditë tepër/.test(home));
+
+// un voyage planifié qui tient
+await page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.stays = [
+    { id: "r1", entry: "2026-06-01", exit: "2026-06-10", country: "DE" },
+    { id: "p1", entry: "2026-09-01", exit: "2026-09-10", country: "FR", planned: true },
+  ];
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(700);
+const home2 = await page.locator("body").innerText();
+check("accueil : voyage planifié accepté", /brenda kufirit/.test(home2));
+check("accueil : solde après les voyages planifiés", /10\.09\.2026.*70 ditë|70 ditë.*10\.09\.2026/s.test(home2));
+
 // ── Changement de langue ──────────────────────────────────────────────
+// On remet les 4 séjours du TEST B : la section ci-dessus les avait
+// remplacés, et on veut revérifier les mêmes chiffres dans l'autre langue.
+await page.evaluate(() => {
+  const stays = [
+    ["2026-01-05", "2026-01-19"], ["2026-02-10", "2026-02-24"],
+    ["2026-04-01", "2026-04-30"], ["2026-06-01", "2026-06-20"],
+  ].map(([entry, exit], i) => ({ id: `t${i}`, entry, exit, country: "DE" }));
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.stays = stays;
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
 await page.goto(`${BASE}/settings/`, { waitUntil: "networkidle" });
 await page.waitForTimeout(500);
 check("réglages : sélecteur de langue présent",

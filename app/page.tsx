@@ -70,17 +70,17 @@ export default function HomePage() {
         <h1 className="text-xl font-bold tracking-tight">{t.home.title}</h1>
       </header>
 
-      <Card className="pt-6">
+      <Card className="pt-5">
         <Ring used={Math.min(status.used, MAX_DAYS)} max={MAX_DAYS} color={TONE_HEX[tone]}>
-          <span className={`tnum text-[5.5rem] font-black leading-none ${TONE_TEXT[tone]}`}>
+          <span className={`tnum text-[4rem] font-black leading-none ${TONE_TEXT[tone]}`}>
             {status.remaining}
           </span>
-          <span className="mt-1 text-sm font-medium muted">
+          <span className="mt-0.5 text-xs font-medium muted">
             {status.remaining === 1 ? t.home.dayLeft : t.home.daysLeft}
           </span>
         </Ring>
 
-        <div className="mt-4 space-y-1 text-center">
+        <div className="mt-3 space-y-0.5 text-center">
           <p className="tnum text-sm font-medium">
             {fill(t.home.usedOf, { used: status.used })}
           </p>
@@ -90,7 +90,6 @@ export default function HomePage() {
               to: formatDate(status.windowTo),
             })}
           </p>
-          <p className="text-xs muted">{t.home.windowExplain}</p>
         </div>
       </Card>
 
@@ -123,7 +122,7 @@ export default function HomePage() {
       ) : (
         <Card>
           {status.maxStay.days > 0 ? (
-            <p className="text-base font-semibold">
+            <p className="text-sm font-semibold">
               ✅{" "}
               {fill(t.home.outsideCanEnter, {
                 date: formatDate(status.maxStay.lastPossibleExit),
@@ -131,39 +130,113 @@ export default function HomePage() {
               })}
             </p>
           ) : (
-            <p className="text-base font-semibold text-[var(--color-bad)]">
+            <p className="text-sm font-semibold text-[var(--color-bad)]">
               ⛔{" "}
               {fill(t.home.outsideBlocked, {
                 date: formatDate(status.earliestReentry),
               })}
             </p>
           )}
-          <p className="mt-1 text-sm muted">
+          <p className="mt-1 text-xs muted">
             {fill(t.home.fullReset, { date: formatDate(status.fullReset) })}
           </p>
         </Card>
       )}
 
       <div className="grid grid-cols-2 gap-3">
-        <Button onClick={enterToday} className="py-5 text-base">
+        <Button onClick={enterToday} className="py-4 text-sm">
           ⬇︎ {t.home.enteredToday}
         </Button>
-        <Button onClick={exitToday} variant="ghost" className="py-5 text-base">
+        <Button onClick={exitToday} variant="ghost" className="py-4 text-sm">
           ⬆︎ {t.home.exitedToday}
         </Button>
       </div>
 
-      {stays.length === 0 ? (
-        <Card>
-          <p className="text-sm muted">{t.home.emptyState}</p>
-          <Link
-            href="/stays"
-            className="mt-3 inline-block font-semibold underline underline-offset-4"
-          >
-            {t.home.addFirst} →
-          </Link>
+      {/* Résumé de l'historique réel */}
+      <Card>
+        <h2 className="text-sm font-semibold muted">{t.home.summaryTitle}</h2>
+        {status.summary.stayCount === 0 ? (
+          <>
+            <p className="mt-1 text-sm muted">{t.home.emptyState}</p>
+            <Link
+              href="/stays"
+              className="mt-3 inline-block font-semibold underline underline-offset-4"
+            >
+              {t.home.addFirst} →
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="tnum mt-1 font-semibold">
+              {fill(t.home.summaryStays, {
+                n: status.summary.stayCount,
+                days: status.summary.totalDays,
+              })}
+            </p>
+            <Link
+              href="/stays"
+              className="mt-2 inline-block text-sm underline underline-offset-4"
+            >
+              {t.nav.stays} →
+            </Link>
+          </>
+        )}
+      </Card>
+
+      {/* Projection : historique réel + TOUS les voyages planifiés */}
+      {status.planned.trips.length > 0 ? (
+        <Card
+          className={
+            status.planned.anyOverflow ? "border-[var(--color-bad)]" : "border-[var(--color-ok)]"
+          }
+        >
+          <h2 className="text-sm font-semibold muted">{t.home.plannedTitle}</h2>
+
+          <ul className="tnum mt-2 space-y-1 text-sm">
+            {status.planned.trips.map((trip) => (
+              <li key={trip.stay.id} className="flex items-start gap-2">
+                <span aria-hidden>{trip.ok ? "✅" : "⛔"}</span>
+                <span className={trip.ok ? "" : "font-semibold text-[var(--color-bad)]"}>
+                  {fill(t.home.plannedTrip, {
+                    from: formatDate(trip.entry),
+                    to: formatDate(trip.exit),
+                    n: trip.days,
+                  })}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {status.planned.anyOverflow ? (
+            <p className="tnum mt-3 rounded-xl bg-[var(--color-bad-soft)] px-3 py-2 text-sm font-semibold text-[#7f1d1d]">
+              {fill(t.home.plannedBad, {
+                date: formatDate(status.planned.firstOverflowDate ?? ""),
+                n: status.planned.daysOver,
+              })}
+            </p>
+          ) : (
+            <p className="mt-3 text-sm font-medium text-[var(--color-ok)]">
+              ✓ {t.home.plannedOk}
+            </p>
+          )}
+
+          {status.planned.lastExit ? (
+            <p className="tnum mt-2 text-sm muted">
+              {fill(t.home.plannedAfter, {
+                date: formatDate(status.planned.lastExit),
+                n: status.planned.remainingAfter,
+              })}
+            </p>
+          ) : null}
         </Card>
-      ) : null}
+      ) : (
+        <Link
+          href="/plan"
+          className="surface block rounded-2xl p-4 text-center font-semibold underline underline-offset-4"
+        >
+          ✈ {t.home.goPlan} →
+        </Link>
+      )}
 
       <InstallPrompt />
 

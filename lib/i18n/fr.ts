@@ -43,6 +43,16 @@ const fr: Messages = {
     overstayFrom: "Le dépassement a commencé le {date}.",
     emptyState: "Aucun séjour enregistré pour l'instant. Ajoute les séjours passés pour que le calcul soit juste.",
     addFirst: "Ajouter le premier séjour",
+    summaryTitle: "Résumé",
+    summaryStays: "{n} séjours enregistrés · {days} jours",
+    summaryNone: "Aucun séjour enregistré.",
+    plannedTitle: "Avec les voyages planifiés",
+    plannedCount: "{n} voyages planifiés",
+    plannedOk: "Tous les voyages planifiés tiennent dans la limite.",
+    plannedBad: "Un voyage planifié dépasse la limite le {date} ({n} jours de trop).",
+    plannedAfter: "Après eux, le {date}, il te restera {n} jours.",
+    plannedTrip: "{from} → {to} ({n} jours)",
+    goPlan: "Planifier un voyage",
   },
 
   stays: {
@@ -72,6 +82,10 @@ const fr: Messages = {
     cancel: "Annuler",
     markExit: "Noter la sortie",
     total: "{n} jours enregistrés au total",
+    sectionReal: "Séjours effectués",
+    sectionPlanned: "Voyages planifiés",
+    deleteTitle: "Supprimer ce séjour ?",
+    deleteBody: "{from} → {to}. Cette action est irréversible.",
   },
 
   plan: {
@@ -200,6 +214,8 @@ const fr: Messages = {
     install: "Installer l'application",
     installHint: "Ajoute-la à l'écran d'accueil pour l'ouvrir comme une application, même sans internet.",
     language: "Langue",
+    confirm: "Oui, supprimer",
+    cancelAction: "Non, annuler",
   },
 };
 

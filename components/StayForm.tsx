@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Stay } from "@/lib/types";
-import { Button, DateInput, Field, Select, TextInput, Toggle } from "@/components/ui";
+import { Button, DateInput, Field, Select } from "@/components/ui";
 import { countriesForPicker } from "@/lib/schengen-membership";
 import { isIsoDate, isBefore } from "@/lib/date";
 import { useT } from "@/components/Store";
@@ -26,8 +26,6 @@ export function StayForm({
   const [entry, setEntry] = useState(initial?.entry ?? "");
   const [exit, setExit] = useState(initial?.exit ?? "");
   const [country, setCountry] = useState(initial?.country ?? "DE");
-  const [note, setNote] = useState(initial?.note ?? "");
-  const [exempt, setExempt] = useState(Boolean(initial?.exempt));
   const [error, setError] = useState<string | null>(null);
   const t = useT();
 
@@ -52,8 +50,10 @@ export function StayForm({
       exit: exit === "" ? null : exit,
       country,
     };
-    if (note.trim()) draft.note = note.trim();
-    if (exempt) draft.exempt = true;
+    // Conservés s'ils existaient déjà (données importées) : le moteur sait
+    // toujours les traiter, l'interface ne les propose simplement plus.
+    if (initial?.note) draft.note = initial.note;
+    if (initial?.exempt) draft.exempt = true;
     if (initial?.planned) draft.planned = true;
     onSave(draft);
   }
@@ -79,18 +79,6 @@ export function StayForm({
           ))}
         </Select>
       </Field>
-
-      <Field label={t.stays.note} htmlFor="note">
-        <TextInput
-          id="note"
-          value={note}
-          onChange={setNote}
-          placeholder={t.stays.notePlaceholder}
-        />
-      </Field>
-
-      <Toggle checked={exempt} onChange={setExempt} label={t.stays.exemptLabel} />
-      <p className="text-xs muted">{t.stays.exemptHelp}</p>
 
       {error ? (
         <p className="rounded-xl bg-[var(--color-bad-soft)] px-3 py-2 text-sm font-medium text-[#7f1d1d]">

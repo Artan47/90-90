@@ -5,7 +5,7 @@ import {
   windowStart, windowEnd, countedDays, usedOn, remainingOn, isCompliantOn,
   maxStayFrom, earliestReentry, fullResetDate, simulate, timeline, validate,
   stayDays, currentStay, mustLeaveBy, statusOn, materializePlanned,
-  MAX_ITERATIONS,
+  MAX_ITERATIONS, plannedOutlook, summarize,
 } from "./schengen";
 import { inclusiveDays, addDays } from "./date";
 
@@ -519,6 +519,109 @@ describe("mustLeaveBy — avec historique antérieur", () => {
     expect(limit).not.toBeNull();
     expect(usedOn(s, limit!)).toBeLessThanOrEqual(90);
     expect(usedOn(s, addDays(limit!, 1))).toBeGreaterThan(90);
+  });
+});
+
+describe("plannedOutlook — les voyages planifiés jugés EN BLOC", () => {
+  it("sans voyage planifié, rien à signaler", () => {
+    const o = plannedOutlook([stay("2026-01-05", "2026-01-19")], "2026-08-27");
+    expect(o.trips).toEqual([]);
+    expect(o.anyOverflow).toBe(false);
+    expect(o.lastExit).toBeNull();
+    expect(o.remainingAfter).toBe(90);
+  });
+
+  it("un voyage planifié qui tient est accepté", () => {
+    const s = [stay("2026-09-01", "2026-09-10", { planned: true })];
+    const o = plannedOutlook(s, "2026-08-27");
+    expect(o.trips).toHaveLength(1);
+    expect(o.trips[0]!.days).toBe(10);
+    expect(o.trips[0]!.ok).toBe(true);
+    expect(o.anyOverflow).toBe(false);
+    expect(o.lastExit).toBe("2026-09-10");
+    expect(o.remainingAfter).toBe(80);
+  });
+
+  it("tient compte de l'historique réel", () => {
+    // 85 jours déjà consommés : le 5 septembre atteint pile 90, le
+    // dépassement commence donc le 6, et le voyage finit 5 jours au-dessus.
+    const s = [
+      stay("2026-06-01", "2026-08-24"), // 85 j
+      stay("2026-09-01", "2026-09-10", { planned: true }), // 10 j
+    ];
+    expect(stayDays(s[0]!)).toBe(85);
+    const o = plannedOutlook(s, "2026-08-27");
+    expect(o.anyOverflow).toBe(true);
+    expect(o.firstOverflowDate).toBe("2026-09-06");
+    expect(o.daysOver).toBe(5);
+    expect(o.trips[0]!.daysOver).toBe(5);
+  });
+
+  it("DEUX voyages qui passent séparément mais pas ensemble", () => {
+    // C'est tout l'intérêt du calcul en bloc : isolément chacun est légal.
+    const a = stay("2026-01-10", "2026-03-10", { planned: true }); // 60 j
+    const b = stay("2026-03-20", "2026-05-08", { planned: true }); // 50 j
+
+    expect(simulate([], { entry: a.entry, exit: a.exit! }).ok).toBe(true);
+    expect(simulate([], { entry: b.entry, exit: b.exit! }).ok).toBe(true);
+
+    const o = plannedOutlook([a, b], "2026-01-01");
+    expect(o.trips).toHaveLength(2);
+    expect(o.trips[0]!.ok).toBe(true);   // le premier passe
+    expect(o.trips[1]!.ok).toBe(false);  // le second déborde
+    expect(o.anyOverflow).toBe(true);
+    expect(o.daysOver).toBe(20);
+  });
+
+  it("les voyages sont rendus dans l'ordre chronologique", () => {
+    const s = [
+      stay("2026-11-01", "2026-11-05", { planned: true }),
+      stay("2026-09-01", "2026-09-05", { planned: true }),
+    ];
+    const o = plannedOutlook(s, "2026-08-27");
+    expect(o.trips.map((t) => t.entry)).toEqual(["2026-09-01", "2026-11-01"]);
+    expect(o.lastExit).toBe("2026-11-05");
+  });
+
+  it("ignore un voyage planifié sans date de sortie", () => {
+    expect(plannedOutlook([stay("2026-09-01", null, { planned: true })], "2026-08-27").trips)
+      .toEqual([]);
+  });
+});
+
+describe("summarize — résumé de l'historique", () => {
+  it("compte les séjours réels et leurs jours", () => {
+    const s = [
+      stay("2026-01-05", "2026-01-19"), // 15
+      stay("2026-02-10", "2026-02-24"), // 15
+      stay("2026-09-01", "2026-09-10", { planned: true }), // exclu
+    ];
+    expect(summarize(s, "2026-08-27")).toEqual({ stayCount: 2, totalDays: 30 });
+  });
+
+  it("compte un séjour en cours jusqu'à aujourd'hui", () => {
+    expect(summarize([stay("2026-08-01", null)], "2026-08-27"))
+      .toEqual({ stayCount: 1, totalDays: 27 });
+  });
+
+  it("une liste vide donne zéro", () => {
+    expect(summarize([], "2026-08-27")).toEqual({ stayCount: 0, totalDays: 0 });
+  });
+});
+
+describe("statusOn — intègre le résumé et la projection", () => {
+  it("expose les deux en un seul passage", () => {
+    const s = [
+      stay("2026-01-05", "2026-01-19"),
+      stay("2026-09-01", "2026-09-10", { planned: true }),
+    ];
+    const st = statusOn(s, "2026-08-27");
+    expect(st.summary.stayCount).toBe(1);
+    expect(st.summary.totalDays).toBe(15);
+    expect(st.planned.trips).toHaveLength(1);
+    expect(st.planned.anyOverflow).toBe(false);
+    // Le compteur du jour ignore toujours les voyages planifiés.
+    expect(st.used).toBe(0);
   });
 });
 

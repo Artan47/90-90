@@ -48,6 +48,16 @@ const sq = {
     overstayFrom: "Tejkalimi ka nisur më {date}.",
     emptyState: "Ende s'ke regjistruar asnjë qëndrim. Shto qëndrimet e mëparshme që llogaritja të jetë e saktë.",
     addFirst: "Shto qëndrimin e parë",
+    summaryTitle: "Përmbledhje",
+    summaryStays: "{n} qëndrime të regjistruara · {days} ditë",
+    summaryNone: "Asnjë qëndrim i regjistruar.",
+    plannedTitle: "Me udhëtimet e planifikuara",
+    plannedCount: "{n} udhëtime të planifikuara",
+    plannedOk: "Të gjitha udhëtimet e planifikuara janë brenda kufirit.",
+    plannedBad: "Një udhëtim i planifikuar e tejkalon kufirin më {date} ({n} ditë tepër).",
+    plannedAfter: "Pas tyre, më {date}, do të kesh {n} ditë të mbetura.",
+    plannedTrip: "{from} → {to} ({n} ditë)",
+    goPlan: "Planifiko një udhëtim",
   },
 
   stays: {
@@ -77,6 +87,10 @@ const sq = {
     cancel: "Anulo",
     markExit: "Shëno daljen",
     total: "Gjithsej {n} ditë të regjistruara",
+    sectionReal: "Qëndrimet e kryera",
+    sectionPlanned: "Udhëtime të planifikuara",
+    deleteTitle: "Ta fshij këtë qëndrim?",
+    deleteBody: "{from} → {to}. Ky veprim s'kthehet.",
   },
 
   plan: {
@@ -205,6 +219,8 @@ const sq = {
     install: "Instalo aplikacionin",
     installHint: "Shtoje në ekranin bazë për ta hapur si aplikacion, edhe pa internet.",
     language: "Gjuha",
+    confirm: "Po, fshije",
+    cancelAction: "Jo, anulo",
   },
 };
 

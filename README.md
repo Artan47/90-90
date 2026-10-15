@@ -97,7 +97,11 @@ pays.
 | **Bulgarie**, **Roumanie** | `2024-03-31` | frontières aériennes et maritimes ; pleine adhésion le `2025-01-01` |
 | **Chypre** | ❌ jamais | contrôles intérieurs non abolis, quota 90/180 **séparé** |
 | **Irlande** | ❌ jamais | opt-out, régime national |
-| Royaume-Uni, Kosovo, Serbie, autres pays tiers | ❌ jamais | hors Schengen |
+| **Kosovo**, **Macédoine du Nord**, **Albanie** | ❌ jamais | pays d'origine des utilisateurs : proposés pour marquer les sorties |
+
+Le sélecteur de pays ne propose délibérément que les 29 États Schengen, Chypre
+et l'Irlande (les deux cas contre-intuitifs), et les trois pays d'origine
+ci-dessus. Un code pays absent de la table n'est jamais compté.
 
 L'espace Schengen compte aujourd'hui **29 États** : 25 États membres de l'UE plus
 l'Islande, le Liechtenstein, la Norvège et la Suisse. Un test vérifie ce compte.
@@ -175,11 +179,18 @@ Toutes les fonctions de `lib/schengen.ts` sont pures :
 | `simulate(stays, trip)` | Verdict d'un voyage, avec date exacte d'infraction |
 | `timeline(stays, from, to)` | Un point par jour, pour le graphique |
 | `validate(stays, today?)` | `OVERLAP`, `EXIT_BEFORE_ENTRY`, `FUTURE_ENTRY_IN_HISTORY`, `OVER_90` |
+| `plannedOutlook(stays, today)` | Juge les voyages planifiés **en bloc**, pas un par un |
+| `summarize(stays, today)` | Nombre de séjours réels et total de jours |
 | `statusOn(stays, today)` | Vue d'ensemble de l'écran d'accueil |
 
 Un séjour en cours (`exit === null`) est traité comme se terminant le jour
 évalué. Les séjours `planned: true` sont exclus de l'historique réel et
-n'entrent que dans les simulations. Les boucles jour par jour sont bornées à
+n'entrent que dans les simulations.
+
+`plannedOutlook` évalue chaque voyage planifié **dans le contexte de
+l'historique réel ET des autres voyages planifiés** : deux voyages qui passent
+isolément peuvent dépasser le quota une fois mis bout à bout. C'est ce calcul
+unique qui alimente le résumé de l'écran d'accueil. Les boucles jour par jour sont bornées à
 400 itérations (`MAX_ITERATIONS`) pour ne jamais boucler à l'infini.
 
 ---

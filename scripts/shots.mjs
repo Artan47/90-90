@@ -16,8 +16,16 @@ const page = await ctx.newPage();
 await page.addInitScript(()=>{const R=Date;const F=new R("2026-08-27T10:00:00");class X extends R{constructor(...a){super(...(a.length?a:[F.getTime()]))}static now(){return F.getTime()}}globalThis.Date=X;});
 await page.goto(BASE);
 await page.evaluate(()=>{const stays=[["2026-01-05","2026-01-19"],["2026-02-10","2026-02-24"],["2026-04-01","2026-04-30"],["2026-06-01","2026-06-20"]].map(([entry,exit],i)=>({id:`t${i}`,entry,exit,country:"DE"}));localStorage.setItem("sa-dite:v1",JSON.stringify({version:1,stays,profile:{locale:"sq"}}));});
-await page.evaluate(()=>{const d=JSON.parse(localStorage.getItem("sa-dite:v1"));d.profile.locale="fr";localStorage.setItem("sa-dite:v1",JSON.stringify(d));});
-for (const [path,name] of [["/","home-fr"],["/settings/","settings-fr"]]) {
+await page.evaluate(()=>{
+  const stays=[
+    {id:"r1",entry:"2026-04-01",exit:"2026-04-30",country:"DE"},
+    {id:"r2",entry:"2026-06-01",exit:"2026-07-25",country:"IT"},
+    {id:"p1",entry:"2026-09-10",exit:"2026-09-20",country:"FR",planned:true},
+    {id:"p2",entry:"2026-10-05",exit:"2026-11-20",country:"CH",planned:true},
+  ];
+  localStorage.setItem("sa-dite:v1",JSON.stringify({version:1,stays,profile:{locale:"fr"}}));
+});
+for (const [path,name] of [["/","home-fr"],["/stays/","stays-fr"]]) {
   await page.goto(BASE+path,{waitUntil:"networkidle"});
   await page.waitForTimeout(700);
   await page.screenshot({ path: join(shots,`${name}.png`), fullPage: path!=="/" });

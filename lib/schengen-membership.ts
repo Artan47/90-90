@@ -128,24 +128,14 @@ export const COUNTRIES: readonly CountryInfo[] = [
     since: null,
     note: "Opt-out nga Schengeni: regjim kombëtar, nuk prek kuotën.",
   },
-  {
-    code: "GB",
-    name: "Mbretëria e Bashkuar",
-    flag: "🇬🇧",
-    since: null,
-    note: "Vend i tretë: nuk prek kuotën Schengen.",
-  },
+
+  // ── Pays d'origine, hors Schengen ────────────────────────────────────
+  // Volontairement limités aux trois pays des utilisateurs visés : un
+  // séjour chez soi ne consomme rien, il sert juste à marquer les sorties.
   {
     code: "XK",
     name: "Kosovë",
     flag: "🇽🇰",
-    since: null,
-    note: "Jashtë Schengenit.",
-  },
-  {
-    code: "AL",
-    name: "Shqipëri",
-    flag: "🇦🇱",
     since: null,
     note: "Jashtë Schengenit.",
   },
@@ -157,44 +147,9 @@ export const COUNTRIES: readonly CountryInfo[] = [
     note: "Jashtë Schengenit.",
   },
   {
-    code: "ME",
-    name: "Mal i Zi",
-    flag: "🇲🇪",
-    since: null,
-    note: "Jashtë Schengenit.",
-  },
-  {
-    code: "RS",
-    name: "Serbi",
-    flag: "🇷🇸",
-    since: null,
-    note: "Jashtë Schengenit.",
-  },
-  {
-    code: "BA",
-    name: "Bosnjë dhe Hercegovinë",
-    flag: "🇧🇦",
-    since: null,
-    note: "Jashtë Schengenit.",
-  },
-  {
-    code: "TR",
-    name: "Turqi",
-    flag: "🇹🇷",
-    since: null,
-    note: "Jashtë Schengenit.",
-  },
-  {
-    code: "US",
-    name: "SHBA",
-    flag: "🇺🇸",
-    since: null,
-    note: "Jashtë Schengenit.",
-  },
-  {
-    code: "OTHER",
-    name: "Vend tjetër (jo-Schengen)",
-    flag: "🌍",
+    code: "AL",
+    name: "Shqipëri",
+    flag: "🇦🇱",
     since: null,
     note: "Jashtë Schengenit.",
   },

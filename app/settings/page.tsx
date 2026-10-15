@@ -4,7 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/components/Store";
 import { Button, Card, DateInput, Field, PageTitle, Toast } from "@/components/ui";
+import { Confirm } from "@/components/Confirm";
 import { downloadExport, fromImportString } from "@/lib/storage";
+import type { AppData } from "@/lib/types";
 import { statusOn } from "@/lib/schengen";
 import { addDays, diffDays, formatDate, isIsoDate } from "@/lib/date";
 import {
@@ -20,6 +22,8 @@ export default function SettingsPage() {
   } = useStore();
   const [toast, setToast] = useState<string | null>(null);
   const [notif, setNotif] = useState<NotificationSupport>("default");
+  const [pendingClear, setPendingClear] = useState(false);
+  const [pendingImport, setPendingImport] = useState<AppData | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setNotif(notificationSupport()), []);
@@ -66,10 +70,7 @@ export default function SettingsPage() {
     const reader = new FileReader();
     reader.onload = () => {
       try {
-        const parsed = fromImportString(String(reader.result));
-        if (!window.confirm(t.settings.importReplace)) return;
-        replaceAll(parsed);
-        flash(fill(t.settings.imported, { n: parsed.stays.length }));
+        setPendingImport(fromImportString(String(reader.result)));
       } catch {
         flash(t.settings.importFailed);
       }
@@ -183,12 +184,7 @@ export default function SettingsPage() {
         <Button
           variant="danger"
           className="w-full"
-          onClick={() => {
-            if (window.confirm(t.settings.clearConfirm)) {
-              clearAll();
-              flash(t.settings.cleared);
-            }
-          }}
+          onClick={() => setPendingClear(true)}
         >
           {t.settings.clear}
         </Button>
@@ -218,6 +214,33 @@ export default function SettingsPage() {
       >
         {t.settings.about} →
       </Link>
+
+      {pendingClear ? (
+        <Confirm
+          title={t.settings.clear}
+          body={t.settings.clearConfirm}
+          onConfirm={() => {
+            clearAll();
+            setPendingClear(false);
+            flash(t.settings.cleared);
+          }}
+          onCancel={() => setPendingClear(false)}
+        />
+      ) : null}
+
+      {pendingImport ? (
+        <Confirm
+          title={t.settings.import}
+          body={t.settings.importReplace}
+          danger={false}
+          onConfirm={() => {
+            replaceAll(pendingImport);
+            flash(fill(t.settings.imported, { n: pendingImport.stays.length }));
+            setPendingImport(null);
+          }}
+          onCancel={() => setPendingImport(null)}
+        />
+      ) : null}
 
       <Toast message={toast} />
     </div>
