@@ -4,8 +4,10 @@ Application web installable (PWA) qui calcule les jours restants dans l'espace
 Schengen selon la règle **90 jours sur toute période de 180 jours**, pour des
 ressortissants du Kosovo qui font des allers-retours fréquents.
 
-**Plusieurs personnes** peuvent être suivies sur le même appareil, chacune avec
-son historique, son passeport et son compteur — le quota 90/180 est individuel.
+**Chaque personne a son compte local** — email et mot de passe — avec son
+historique, son passeport et son compteur : le quota 90/180 est individuel.
+Les comptes existent uniquement sur l'appareil, et leurs données y sont
+**chiffrées**.
 Interface en **albanais (shqip)** et en **français**, changeable à tout moment
 dans les réglages. Aucun compte, aucun serveur, **aucune donnée ne quitte
 l'appareil**.
@@ -139,7 +141,9 @@ lib/
   storage.ts               localStorage tolérant aux pannes + export/import JSON
   notifications.ts         Rappels locaux (aucun serveur, aucun push distant)
   passport.ts              Validité du passeport (10 ans, 6 mois, 3 mois après sortie)
-  types.ts                 Stay, Person, Profile, AppData
+  types.ts                 Stay, Person, Profile, Account, AppData
+  crypto.ts                PBKDF2 + AES-GCM, via WebCrypto, sans dépendance
+  accounts.ts              Modèle de compte local, protégé ou ouvert
   i18n/sq.ts               Toutes les chaînes, en albanais (langue de référence)
   i18n/fr.ts               Traduction française
   i18n/index.ts            Registre des langues, détection, jetons {x}
@@ -158,6 +162,38 @@ scripts/
   e2e-check.mjs            Vérifie les critères d'acceptation dans un vrai Chromium
 ```
 
+### Comptes locaux
+
+Un compte = une personne = un quota. **Il n'y a aucun serveur** : pas
+d'inscription distante, pas de code de vérification, pas de récupération de
+mot de passe.
+
+Le mot de passe sert réellement à quelque chose. Si l'on se contentait de
+masquer l'écran, n'importe qui ouvrant le stockage du navigateur lirait les
+passeports et les historiques de voyage en clair. Les données d'un compte
+protégé sont donc **chiffrées** :
+
+- PBKDF2-SHA-256, 310 000 itérations (recommandation OWASP), sel aléatoire
+  de 16 octets par compte ;
+- AES-GCM 256 bits, vecteur d'initialisation neuf **à chaque écriture** —
+  réutiliser un IV avec GCM casse la confidentialité ;
+- le mot de passe n'est jamais stocké, sous aucune forme réversible ;
+- AES-GCM étant authentifié, un mot de passe erroné ou un stockage altéré
+  font échouer le déchiffrement au lieu de produire des données corrompues.
+
+La clé vit en mémoire et dans `sessionStorage` : un rechargement ne
+déconnecte pas, fermer l'application si. Un test vérifie qu'après saisie
+d'un séjour, **aucune donnée n'apparaît en clair** dans le stockage.
+
+**Conséquence assumée, annoncée dans l'interface : un mot de passe perdu rend
+les données définitivement illisibles.** L'export JSON est le seul filet.
+
+Les comptes **ouverts** (sans mot de passe) existent parce qu'on ne peut pas
+inventer le mot de passe des personnes déjà enregistrées lors d'une mise à
+jour : elles sont reprises telles quelles, et l'interface invite à les
+protéger. Exiger un mot de passe pendant la migration aurait rendu les
+données inaccessibles à qui n'aurait pas compris l'écran.
+
 ### Plusieurs personnes
 
 Chaque personne a son `id`, son nom, ses séjours et son passeport. Le
@@ -169,8 +205,8 @@ le moindre avertissement.
 Au premier lancement, une personne est créée d'office (« Unë » / « Moi ») pour
 que l'application soit utilisable sans configuration.
 
-**Migration depuis la version 1.** Les sauvegardes mono-personne sont reprises
-telles quelles : leurs séjours deviennent la première personne, le passeport
+**Migration.** Les sauvegardes v1 (une personne implicite) et v2 (plusieurs
+personnes) sont reprises telles quelles : leurs séjours deviennent la première personne, le passeport
 est conservé, et la langue — qui vivait dans le profil — remonte au niveau de
 l'application. La migration est idempotente et couverte par une dizaine de
 tests, dont un qui vérifie qu'**aucun séjour n'est perdu**. Le fichier est

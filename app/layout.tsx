@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { StoreProvider } from "@/components/Store";
-import { Nav } from "@/components/Nav";
-import { PersonBar } from "@/components/PersonBar";
-import { Disclaimer } from "@/components/Disclaimer";
+import { Shell } from "@/components/Shell";
 import { ServiceWorker } from "@/components/ServiceWorker";
 import { t } from "@/lib/i18n";
 
@@ -41,12 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="sq">
       <body className="min-h-dvh">
         <StoreProvider>
-          <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
-            <PersonBar />
-            <main className="flex-1 px-4 pb-40 pt-4">{children}</main>
-            <Disclaimer />
-            <Nav />
-          </div>
+          <Shell>{children}</Shell>
         </StoreProvider>
         <ServiceWorker />
       </body>

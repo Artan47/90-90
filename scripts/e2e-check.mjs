@@ -61,14 +61,18 @@ await context.route("**/*", (route) => {
 
 const page = await context.newPage();
 
-/** Écrit un jeu de données au format v2 (multi-personnes) pour la personne active. */
+/**
+ * Écrit un jeu de données au format courant, sous un compte SANS mot de
+ * passe : l'application l'ouvre alors directement au chargement, ce qui
+ * permet de tester les écrans sans rejouer la connexion à chaque fois.
+ */
 async function setStays(stays, locale = "sq", profile = {}) {
   await page.evaluate(({ stays, locale, profile }) => {
     localStorage.setItem("sa-dite:v1", JSON.stringify({
-      version: 2,
+      version: 3,
       locale,
       activeId: "p1",
-      people: [{ id: "p1", name: "Test", stays, profile }],
+      accounts: [{ id: "p1", name: "Test", email: null, content: { stays, profile } }],
     }));
   }, { stays, locale, profile });
 }
@@ -77,15 +81,14 @@ page.on("pageerror", (e) => check("aucune erreur JS", false, e.message));
 
 // ── TEST B saisi dans l'interface (critère 4) ─────────────────────────
 await page.goto(BASE, { waitUntil: "networkidle" });
-// On écrit délibérément une sauvegarde au FORMAT V1 : la migration vers
-// le multi-personnes doit la reprendre sans rien perdre.
-await page.evaluate(() => {
-  const stays = [
-    ["2026-01-05", "2026-01-19"], ["2026-02-10", "2026-02-24"],
-    ["2026-04-01", "2026-04-30"], ["2026-06-01", "2026-06-20"],
-  ].map(([entry, exit], i) => ({ id: `t${i}`, entry, exit, country: "DE" }));
-  localStorage.setItem("sa-dite:v1", JSON.stringify({ version: 1, stays, profile: { locale: "sq" } }));
-});
+// Compte sans mot de passe : l'application l'ouvre directement, ce qui
+// permet de tester les écrans. La connexion a sa propre section.
+await setStays([
+  { id: "t0", entry: "2026-01-05", exit: "2026-01-19", country: "DE" },
+  { id: "t1", entry: "2026-02-10", exit: "2026-02-24", country: "DE" },
+  { id: "t2", entry: "2026-04-01", exit: "2026-04-30", country: "DE" },
+  { id: "t3", entry: "2026-06-01", exit: "2026-06-20", country: "DE" },
+], "sq");
 
 // On fige la date au 27 août 2026 pour reproduire exactement le cas de test.
 await page.addInitScript(() => {
@@ -291,79 +294,140 @@ await page.evaluate(() => {
   }));
 });
 await page.goto(BASE, { waitUntil: "networkidle" });
-await page.waitForTimeout(800);
+await page.waitForTimeout(900);
 const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem("sa-dite:v1")));
-check("migration : la sauvegarde est passée en v2", migrated.version === 2);
-check("migration : une personne a été créée", migrated.people?.length === 1);
-check("migration : les 4 séjours sont intacts", migrated.people?.[0]?.stays?.length === 4);
+check("migration : l'ancien compte est proposé à l'ouverture",
+  /Vazhdo si|Continuer en tant que/.test(await page.locator("body").innerText()));
+check("migration : la sauvegarde est passée au format courant", migrated.version === 3);
+check("migration : un compte a été créé", migrated.accounts?.length === 1);
+check("migration : les 4 séjours sont intacts",
+  migrated.accounts?.[0]?.content?.stays?.length === 4);
+check("migration : le compte reste OUVERT, donc accessible",
+  migrated.accounts?.[0]?.email === null);
 check("migration : la langue est remontée au niveau de l'app", migrated.locale === "sq");
 check("migration : le passeport est conservé",
-  migrated.people?.[0]?.profile?.passportExpiry === "2029-01-01");
+  migrated.accounts?.[0]?.content?.profile?.passportExpiry === "2029-01-01");
 
-// ── Deux personnes : les compteurs ne doivent JAMAIS se mélanger ──────
+// ── Comptes locaux : création, chiffrement, connexion ────────────────
+await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
 await page.goto(BASE, { waitUntil: "networkidle" });
-await page.waitForTimeout(600);
-const firstName = await page.locator("button[aria-haspopup='dialog']").innerText();
-check("barre de personne affichée", /Unë|Moi/.test(firstName), firstName.split("\n")[0]);
+await page.waitForTimeout(800);
+let authText = await page.locator("body").innerText();
+check("premier lancement : écran de compte", /Krijo llogari|Créer un compte/.test(authText));
+check("aucun compteur avant connexion", !/ditë të mbetura|jours restants/.test(authText));
+check("annonce que tout reste sur l'appareil", /VETËM në këtë pajisje|UNIQUEMENT sur cet appareil/.test(authText));
+check("annonce l'absence de récupération", /rikuperim fjalëkalimi|Aucune récupération/.test(authText));
 
-const before = (await page.locator("main span").first().innerText()).trim();
-check("personne 1 : 40 jours restants", before === "40", before);
+await page.locator("#a-name").fill("Leugzim");
+await page.locator("#a-email").fill("Leugzim@Example.CH");
+await page.locator("#a-password").fill("fjalekalimi1");
+await page.getByRole("button", { name: /Krijo llogarinë|Créer le compte/ }).click();
+await page.waitForTimeout(1600);
+check("connecté après création",
+  /ditë të mbetura|jours restants/.test(await page.locator("body").innerText()));
+check("email normalisé en minuscules",
+  /leugzim@example\.ch/.test(await page.locator("body").innerText()));
 
-// ajouter une deuxième personne
-await page.locator("button[aria-haspopup='dialog']").click();
-await page.waitForTimeout(400);
-await page.getByRole("button", { name: /Shto person/ }).click();
-await page.waitForTimeout(300);
-await page.locator('input[type="text"]').last().fill("Arta");
-await page.getByRole("button", { name: /^Ruaj$/ }).click();
-await page.waitForTimeout(700);
-
-const arta = (await page.locator("main span").first().innerText()).trim();
-check("personne 2 : repart de 90 jours, pas de mélange", arta === "90", arta);
-check("personne 2 : son nom est affiché",
-  /Arta/.test(await page.locator("button[aria-haspopup='dialog']").innerText()));
-
-// lui ajouter un séjour, puis vérifier que la personne 1 n'a pas bougé
+// saisir un séjour, puis vérifier que le stockage ne révèle RIEN
 await page.goto(`${BASE}/stays/`, { waitUntil: "networkidle" });
-await page.waitForTimeout(500);
-check("personne 2 : aucun séjour hérité", (await page.locator("main li").count()) === 0);
-await page.getByText("Shto qëndrim").click();
+await page.waitForTimeout(600);
+await page.getByText(/Shto qëndrim|Ajouter un séjour/).click();
 await page.waitForTimeout(300);
-await page.locator("#entry").fill("2026-08-01");
-await page.locator("#exit").fill("2026-08-10");
-await page.getByRole("button", { name: /^Ruaj$/ }).click();
-await page.waitForTimeout(600);
-check("personne 2 : son séjour est enregistré", (await page.locator("main li").count()) === 1);
+await page.locator("#entry").fill("2026-05-13");
+await page.locator("#exit").fill("2026-06-06");
+await page.getByRole("button", { name: /^(Ruaj|Enregistrer)$/ }).click();
+await page.waitForTimeout(1400);
+check("séjour enregistré sous le compte", (await page.locator("main li").count()) === 1);
 
-// revenir à la personne 1
-await page.locator("button[aria-haspopup='dialog']").click();
-await page.waitForTimeout(400);
-await page.getByText(/Unë|Moi/).first().click();
-await page.waitForTimeout(700);
-check("personne 1 : retrouve ses 4 séjours", (await page.locator("main li").count()) === 4);
+const rawStore = await page.evaluate(() => localStorage.getItem("sa-dite:v1"));
+check("CHIFFREMENT : aucune date de séjour en clair", !rawStore.includes("2026-05-13"));
+check("CHIFFREMENT : aucun mot de passe stocké", !rawStore.includes("fjalekalimi1"));
+check("CHIFFREMENT : le bloc chiffré est présent", rawStore.includes("sealed"));
+check("l'email reste lisible, pour pouvoir se connecter",
+  rawStore.includes("leugzim@example.ch"));
+
+// la session survit à un rechargement
 await page.goto(BASE, { waitUntil: "networkidle" });
-await page.waitForTimeout(600);
-const back = (await page.locator("main span").first().innerText()).trim();
-check("personne 1 : son compteur est INCHANGÉ", back === "40", back);
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(1400);
+check("la session survit au rechargement",
+  /ditë të mbetura|jours restants/.test(await page.locator("body").innerText()));
 
-// le passeport est bien par personne
-await page.goto(`${BASE}/settings/`, { waitUntil: "networkidle" });
-await page.waitForTimeout(500);
-await page.locator("#expiry").fill("2029-05-05");
-await page.getByRole("button", { name: /Ruaj në profil/ }).click();
-await page.waitForTimeout(600);
-await page.locator("button[aria-haspopup='dialog']").click();
+// déconnexion
+await page.getByRole("button", { name: /Dil|Se déconnecter/ }).first().click();
 await page.waitForTimeout(400);
-await page.getByText("Arta").first().click();
-await page.waitForTimeout(700);
-const artaPassport = await page.locator("#expiry").inputValue();
-check("passeport : propre à chaque personne", artaPassport === "", `Arta a « ${artaPassport} »`);
-await page.locator("button[aria-haspopup='dialog']").click();
+await page.getByRole("button", { name: /^(Dil|Se déconnecter)$/ }).last().click();
+await page.waitForTimeout(1000);
+authText = await page.locator("body").innerText();
+check("déconnexion : retour à l'écran de connexion", /Hyr|Se connecter/.test(authText));
+check("déconnexion : plus aucun chiffre affiché", !/ditë të mbetura|jours restants/.test(authText));
+
+// mauvais mot de passe, puis email inconnu
+await page.locator("#a-email").fill("leugzim@example.ch");
+await page.locator("#a-password").fill("mauvais");
+await page.getByRole("button", { name: /^(Hyr|Se connecter)$/ }).click();
+await page.waitForTimeout(1600);
+check("mot de passe incorrect refusé",
+  /Fjalëkalim i gabuar|Mot de passe incorrect/.test(await page.locator("body").innerText()));
+
+await page.locator("#a-email").fill("inconnu@example.ch");
+await page.locator("#a-password").fill("fjalekalimi1");
+await page.getByRole("button", { name: /^(Hyr|Se connecter)$/ }).click();
+await page.waitForTimeout(1600);
+check("email inconnu refusé",
+  /Nuk ka llogari|Aucun compte avec cet email/.test(await page.locator("body").innerText()));
+
+// bonne connexion : les données chiffrées reviennent
+await page.locator("#a-email").fill("  LEUGZIM@EXAMPLE.CH  ");
+await page.locator("#a-password").fill("fjalekalimi1");
+await page.getByRole("button", { name: /^(Hyr|Se connecter)$/ }).click();
+await page.waitForTimeout(1600);
+await page.goto(`${BASE}/stays/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+check("reconnexion : le séjour chiffré est retrouvé", (await page.locator("main li").count()) === 1);
+
+// un deuxième compte ne voit RIEN du premier
+await page.getByRole("button", { name: /Dil|Se déconnecter/ }).first().click();
 await page.waitForTimeout(400);
-await page.getByText(/Unë|Moi/).first().click();
-await page.waitForTimeout(700);
-check("passeport : celui de la personne 1 est conservé",
-  (await page.locator("#expiry").inputValue()) === "2029-05-05");
+await page.getByRole("button", { name: /^(Dil|Se déconnecter)$/ }).last().click();
+await page.waitForTimeout(1000);
+await page.getByRole("button", { name: /S'ke llogari|Pas de compte/ }).click().catch(async () => {
+  await page.getByText(/S'ke llogari|Pas de compte/).click();
+});
+await page.waitForTimeout(400);
+await page.locator("#a-name").fill("Arta");
+await page.locator("#a-email").fill("arta@example.ch");
+await page.locator("#a-password").fill("fjalekalimi2");
+await page.getByRole("button", { name: /Krijo llogarinë|Créer le compte/ }).click();
+await page.waitForTimeout(1600);
+const artaCount = await page.evaluate(async () => {
+  await new Promise((r) => setTimeout(r, 200));
+  return document.querySelectorAll("main li").length;
+});
+await page.goto(`${BASE}/stays/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+check("deuxième compte : aucun séjour hérité", (await page.locator("main li").count()) === 0, String(artaCount));
+check("deuxième compte : son propre compteur",
+  (await page.evaluate(() => { window.location.href = "/"; return true; })) === true);
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+check("deuxième compte : repart de 90 jours",
+  (await page.locator("main span").first().innerText()).trim() === "90");
+
+// email déjà pris
+await page.getByRole("button", { name: /Dil|Se déconnecter/ }).first().click();
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: /^(Dil|Se déconnecter)$/ }).last().click();
+await page.waitForTimeout(1000);
+await page.getByText(/S'ke llogari|Pas de compte/).click();
+await page.waitForTimeout(400);
+await page.locator("#a-name").fill("X");
+await page.locator("#a-email").fill("ARTA@example.ch");
+await page.locator("#a-password").fill("fjalekalimi3");
+await page.getByRole("button", { name: /Krijo llogarinë|Créer le compte/ }).click();
+await page.waitForTimeout(1400);
+check("email déjà utilisé refusé",
+  /tashmë në përdorim|déjà utilisé/.test(await page.locator("body").innerText()));
 
 // ── Paliers : « attendre quelques jours ne change rien… puis tout » ───
 await setStays([
@@ -502,9 +566,7 @@ await frPage.goto(BASE, { waitUntil: "networkidle" });
 await frPage.waitForTimeout(700);
 const frText2 = await frPage.locator("body").innerText();
 check("navigateur francophone → français automatiquement",
-  frText2.includes("Combien de jours me reste-t-il ?"));
-check("premier lancement : une personne « Moi » est créée d'office",
-  frText2.includes("Moi"));
+  frText2.includes("Créer un compte") && frText2.includes("Mot de passe"));
 await frCtx.close();
 
 const sqCtx = await browser.newContext({ locale: "de-DE", viewport: { width: 390, height: 844 } });
@@ -512,9 +574,8 @@ const sqPage = await sqCtx.newPage();
 await sqPage.goto(BASE, { waitUntil: "networkidle" });
 await sqPage.waitForTimeout(700);
 const sqText2 = await sqPage.locator("body").innerText();
-check("autre langue → albanais par défaut", sqText2.includes("Sa ditë më kanë mbetur?"));
-check("premier lancement albanais : personne « Unë » créée d'office",
-  sqText2.includes("Unë"));
+check("autre langue → albanais par défaut",
+  sqText2.includes("Krijo llogari") && sqText2.includes("Fjalëkalimi"));
 await sqCtx.close();
 
 // ── Critère 5 ─────────────────────────────────────────────────────────

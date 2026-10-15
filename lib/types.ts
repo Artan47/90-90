@@ -1,5 +1,6 @@
 import type { IsoDate } from "./date";
 import type { Locale } from "./i18n";
+import type { Account } from "./accounts";
 
 export type { IsoDate };
 
@@ -44,11 +45,12 @@ export interface Person {
 }
 
 export interface AppData {
-  version: 2;
-  people: Person[];
-  /** Personne affichée. `null` si la liste est vide. */
+  version: 3;
+  /** Comptes locaux : un par personne. */
+  accounts: Account[];
+  /** Compte connecté. `null` si personne n'est connecté. */
   activeId: string | null;
-  /** Langue de l'interface — commune à toutes les personnes. */
+  /** Langue de l'interface — commune à tous les comptes. */
   locale: Locale | null;
 }
 
@@ -59,11 +61,11 @@ export function makePerson(id: string, name: string): Person {
 }
 
 export function emptyData(): AppData {
-  return { version: 2, people: [], activeId: null, locale: null };
+  return { version: 3, accounts: [], activeId: null, locale: null };
 }
 
-/** La personne affichée, ou `null` si aucune. */
-export function activePerson(data: AppData): Person | null {
-  if (data.people.length === 0) return null;
-  return data.people.find((p) => p.id === data.activeId) ?? data.people[0] ?? null;
+/** Le compte connecté, ou `null`. */
+export function activeAccount(data: AppData): Account | null {
+  if (data.activeId === null) return null;
+  return data.accounts.find((a) => a.id === data.activeId) ?? null;
 }

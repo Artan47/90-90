@@ -16,6 +16,8 @@ export default defineConfig({
         "lib/date.ts",
         "lib/schengen-membership.ts",
         "lib/passport.ts",
+        "lib/crypto.ts",
+        "lib/accounts.ts",
       ],
       thresholds: { lines: 95, functions: 95, branches: 90, statements: 95 },
     },

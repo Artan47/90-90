@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useStore } from "@/components/Store";
-import { Button, Card, DateInput, Field, PageTitle, Toast } from "@/components/ui";
+import { Button, Card, DateInput, Field, PageTitle, TextInput, Toast } from "@/components/ui";
+import { isProtected } from "@/lib/accounts";
+import { MIN_PASSWORD_LENGTH } from "@/lib/crypto";
 import { Confirm } from "@/components/Confirm";
 import { downloadExport, fromImportString } from "@/lib/storage";
 import type { AppData } from "@/lib/types";
@@ -15,6 +17,86 @@ import {
   type NotificationSupport,
 } from "@/lib/notifications";
 import { LOCALE_LABELS, LOCALE_ORDER } from "@/lib/i18n";
+
+/** Compte connecté : nom, état de protection, et mise sous mot de passe. */
+function AccountSection() {
+  const { account, t, fmt, protectAccount, renameAccount } = useStore();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (account) setName(account.name);
+  }, [account?.id, account?.name]);
+
+  if (!account) return null;
+  const locked = isProtected(account);
+
+  return (
+    <Card className="space-y-3">
+      <h2 className="font-bold">{t.people.title}</h2>
+
+      <Field label={t.auth.name} htmlFor="acc-name">
+        <TextInput id="acc-name" value={name} onChange={setName} />
+      </Field>
+      <Button
+        variant="ghost"
+        className="w-full"
+        disabled={name.trim() === account.name || name.trim() === ""}
+        onClick={() => renameAccount(account.id, name)}
+      >
+        {t.people.rename}
+      </Button>
+
+      {locked ? (
+        <p className="text-sm text-[var(--color-ok)]">
+          🔒 {t.auth.isProtected} — {account.email}
+        </p>
+      ) : (
+        <div className="space-y-2 border-t border-[var(--border)] pt-3">
+          <p className="text-sm font-semibold">{t.auth.protectTitle}</p>
+          <p className="text-xs muted">{t.auth.protectHint}</p>
+          <Field label={t.auth.email} htmlFor="acc-email">
+            <TextInput id="acc-email" value={email} onChange={setEmail} />
+          </Field>
+          <Field label={t.auth.password} htmlFor="acc-pass">
+            <input
+              id="acc-pass"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 outline-none"
+            />
+          </Field>
+          <Button
+            className="w-full"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              const r = await protectAccount(email, password);
+              setBusy(false);
+              setPassword("");
+              setNote(
+                r === "ok"
+                  ? t.auth.protected
+                  : r === "email-taken"
+                    ? t.auth.errEmailTaken
+                    : fmt(t.auth.errInvalid, { n: MIN_PASSWORD_LENGTH }),
+              );
+            }}
+          >
+            {t.auth.protect}
+          </Button>
+          <p className="text-xs muted">⚠️ {t.auth.noRecovery}</p>
+          {note ? <p className="text-sm font-medium">{note}</p> : null}
+        </div>
+      )}
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const {
@@ -112,6 +194,8 @@ export default function SettingsPage() {
           </p>
         </Card>
       ) : null}
+
+      <AccountSection />
 
       <Card className="space-y-2">
         <h2 className="font-bold">{t.common.language}</h2>
@@ -267,7 +351,7 @@ export default function SettingsPage() {
           onConfirm={() => {
             replaceAll(pendingImport);
             flash(fmt(t.settings.imported, {
-            n: pendingImport.people.reduce((n, p) => n + p.stays.length, 0),
+            n: pendingImport.accounts.length,
           }));
             setPendingImport(null);
           }}

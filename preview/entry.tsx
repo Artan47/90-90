@@ -14,9 +14,7 @@ import { StrictMode } from "react";
 import { usePathname } from "next/navigation";
 
 import { StoreProvider } from "@/components/Store";
-import { Nav } from "@/components/Nav";
-import { Disclaimer } from "@/components/Disclaimer";
-import { PersonBar } from "@/components/PersonBar";
+import { Shell } from "@/components/Shell";
 
 import HomePage from "@/app/page";
 import StaysPage from "@/app/stays/page";
@@ -40,14 +38,9 @@ function App() {
   const Screen = ROUTES[pathname] ?? HomePage;
   return (
     <StoreProvider>
-      <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
-        <PersonBar />
-        <main className="flex-1 px-4 pb-40 pt-4">
-          <Screen />
-        </main>
-        <Disclaimer />
-        <Nav />
-      </div>
+      <Shell>
+        <Screen />
+      </Shell>
     </StoreProvider>
   );
 }

@@ -12,6 +12,9 @@
 
 import type { AppData, Person, Profile, Stay } from "./types";
 import { emptyData } from "./types";
+import type { Account, AccountContent } from "./accounts";
+import { personToAccount } from "./accounts";
+import { normalizeEmail } from "./crypto";
 import { isIsoDate } from "./date";
 import { isLocale, type Locale } from "./i18n";
 
@@ -56,11 +59,16 @@ function writeRaw(value: string): void {
 
 /**
  * Valide une structure venue de localStorage ou d'un fichier importé, et
- * MIGRE les sauvegardes de la version 1 (mono-personne).
+ * MIGRE les anciennes sauvegardes.
  *
- * Tout ce qui n'est pas reconnu est écarté plutôt que de faire planter
- * l'application au démarrage. Une sauvegarde v1 ne doit JAMAIS être
- * perdue : ses séjours et son passeport deviennent la première personne.
+ *   v1 — une personne implicite      → un compte ouvert
+ *   v2 — plusieurs personnes         → un compte ouvert par personne
+ *   v3 — comptes (format courant)
+ *
+ * Aucune donnée n'est jamais perdue : une personne sans mot de passe
+ * devient un compte OUVERT, que l'interface invite ensuite à protéger.
+ * Exiger un mot de passe pendant la migration aurait rendu les données
+ * inaccessibles à qui n'aurait pas compris l'écran.
  */
 export function parseData(raw: unknown, defaultName = "Unë"): AppData {
   if (typeof raw !== "object" || raw === null) return emptyData();
@@ -68,14 +76,22 @@ export function parseData(raw: unknown, defaultName = "Unë"): AppData {
 
   const locale = isLocale(obj.locale) ? obj.locale : null;
 
-  // ── Version 2 : plusieurs personnes ──────────────────────────────────
-  if (Array.isArray(obj.people)) {
-    const people = obj.people.flatMap((p) => sanitizePerson(p, defaultName));
+  // ── Version 3 : comptes ──────────────────────────────────────────────
+  if (Array.isArray(obj.accounts)) {
+    const accounts = obj.accounts.flatMap((a) => sanitizeAccount(a, defaultName));
     const activeId =
-      typeof obj.activeId === "string" && people.some((p) => p.id === obj.activeId)
+      typeof obj.activeId === "string" && accounts.some((a) => a.id === obj.activeId)
         ? obj.activeId
-        : (people[0]?.id ?? null);
-    return { version: 2, people, activeId, locale };
+        : null;
+    return { version: 3, accounts, activeId, locale };
+  }
+
+  // ── Version 2 : personnes ────────────────────────────────────────────
+  if (Array.isArray(obj.people)) {
+    const accounts = obj.people
+      .flatMap((p) => sanitizePerson(p, defaultName))
+      .map(personToAccount);
+    return { version: 3, accounts, activeId: null, locale };
   }
 
   // ── Version 1 : une seule personne, implicite ────────────────────────
@@ -85,18 +101,75 @@ export function parseData(raw: unknown, defaultName = "Unë"): AppData {
       defaultName,
     )[0];
     if (!person) return { ...emptyData(), locale };
-    // En v1 la langue vivait dans le profil : on la remonte.
     const legacy = person.profile.locale;
     delete person.profile.locale;
     return {
-      version: 2,
-      people: [person],
-      activeId: person.id,
+      version: 3,
+      accounts: [personToAccount(person)],
+      activeId: null,
       locale: locale ?? (isLocale(legacy) ? legacy : null),
     };
   }
 
   return { ...emptyData(), locale };
+}
+
+function sanitizeAccount(raw: unknown, defaultName: string): Account[] {
+  if (typeof raw !== "object" || raw === null) return [];
+  const a = raw as Record<string, unknown>;
+
+  const id = typeof a.id === "string" && a.id.length > 0 ? a.id : newId();
+  const name =
+    typeof a.name === "string" && a.name.trim().length > 0
+      ? a.name.trim().slice(0, 40)
+      : defaultName;
+  const email =
+    typeof a.email === "string" && a.email.trim().length > 0
+      ? normalizeEmail(a.email)
+      : null;
+
+  const sealedRaw = a.sealed as Record<string, unknown> | undefined;
+  const sealed =
+    sealedRaw &&
+    typeof sealedRaw.salt === "string" &&
+    typeof sealedRaw.iv === "string" &&
+    typeof sealedRaw.data === "string"
+      ? { salt: sealedRaw.salt, iv: sealedRaw.iv, data: sealedRaw.data }
+      : undefined;
+
+  // Protégé : on ne garde QUE le chiffré. Ouvert : on ne garde que le clair.
+  if (email !== null && sealed) return [{ id, name, email, sealed }];
+  return [{ id, name, email: null, content: sanitizeContent(a.content) }];
+}
+
+export function sanitizeContent(raw: unknown): AccountContent {
+  if (typeof raw !== "object" || raw === null) return { stays: [], profile: {} };
+  const c = raw as Record<string, unknown>;
+  const person = sanitizePerson({ id: "x", name: "x", stays: c.stays, profile: c.profile }, "x")[0];
+  return { stays: person?.stays ?? [], profile: person?.profile ?? {} };
+}
+
+function sanitizePerson(raw: unknown, defaultName: string): Person[] {
+  if (typeof raw !== "object" || raw === null) return [];
+  const p = raw as Record<string, unknown>;
+
+  const stays = Array.isArray(p.stays) ? p.stays.flatMap(sanitizeStay) : [];
+  const profileRaw =
+    typeof p.profile === "object" && p.profile !== null
+      ? (p.profile as Record<string, unknown>)
+      : {};
+
+  const profile: Profile = {};
+  if (isIsoDate(profileRaw.passportExpiry)) profile.passportExpiry = profileRaw.passportExpiry;
+  if (isIsoDate(profileRaw.passportIssued)) profile.passportIssued = profileRaw.passportIssued;
+  if (isLocale(profileRaw.locale)) profile.locale = profileRaw.locale;
+
+  const name =
+    typeof p.name === "string" && p.name.trim().length > 0
+      ? p.name.trim().slice(0, 40)
+      : defaultName;
+
+  return [{ id: typeof p.id === "string" && p.id.length > 0 ? p.id : newId(), name, stays, profile }];
 }
 
 function sanitizeStay(raw: unknown): Stay[] {
@@ -120,44 +193,6 @@ function sanitizeStay(raw: unknown): Stay[] {
   return [stay];
 }
 
-function sanitizePerson(raw: unknown, defaultName: string): Person[] {
-  if (typeof raw !== "object" || raw === null) return [];
-  const p = raw as Record<string, unknown>;
-
-  const stays = Array.isArray(p.stays) ? p.stays.flatMap(sanitizeStay) : [];
-  const profileRaw =
-    typeof p.profile === "object" && p.profile !== null
-      ? (p.profile as Record<string, unknown>)
-      : {};
-
-  const profile: Profile = {};
-  if (isIsoDate(profileRaw.passportExpiry)) profile.passportExpiry = profileRaw.passportExpiry;
-  if (isIsoDate(profileRaw.passportIssued)) profile.passportIssued = profileRaw.passportIssued;
-  if (isLocale(profileRaw.locale)) profile.locale = profileRaw.locale;
-
-  const name =
-    typeof p.name === "string" && p.name.trim().length > 0
-      ? p.name.trim().slice(0, 40)
-      : defaultName;
-
-  return [
-    {
-      id: typeof p.id === "string" && p.id.length > 0 ? p.id : newId(),
-      name,
-      stays,
-      profile,
-    },
-  ];
-}
-
-/**
- * Langue enregistrée, lue SANS parser toute la sauvegarde.
- *
- * Sert à nommer correctement la personne créée par défaut : sans ça, le
- * nom viendrait de la langue du navigateur alors que l'utilisateur a pu en
- * choisir une autre, et on afficherait « Unë » dans une interface
- * française.
- */
 export function peekLocale(): Locale | null {
   const raw = readRaw();
   if (!raw) return null;
