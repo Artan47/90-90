@@ -12,6 +12,15 @@
 #   export SADITE_FTP_PASS=votre_mot_de_passe
 #   export SADITE_FTP_DIR=/web           # dossier racine du site
 #
+# Sur l'offre Starter (gratuite avec le domaine), Infomaniak n'accepte que
+# le FTP simple sur le port 21 : ni FTPS, ni SFTP. Dans ce cas seulement :
+#
+#   export SADITE_FTP_PLAIN=1
+#
+# Le mot de passe circule alors en clair sur le réseau. À n'utiliser que
+# sur une offre qui ne propose rien d'autre, et depuis une connexion de
+# confiance.
+#
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -43,9 +52,17 @@ echo "→ Envoi vers ${HOST}:${DIR}…"
 # --delete retire du serveur les fichiers absents de out/ : indispensable
 # pour que les anciens bundles JavaScript disparaissent.
 # --exclude-glob .well-known/ laisse intact le dossier des certificats.
+if [ "${SADITE_FTP_PLAIN:-0}" = "1" ]; then
+  echo "⚠ FTP NON CHIFFRÉ (offre Starter) : le mot de passe circule en clair."
+  SSL_SETTINGS="set ftp:ssl-allow false"
+else
+  SSL_SETTINGS="set ftp:ssl-allow true
+set ftp:ssl-force true
+set ssl:verify-certificate true"
+fi
+
 lftp -u "$SADITE_FTP_USER","$SADITE_FTP_PASS" "$HOST" <<LFTP
-set ftp:ssl-allow true
-set ssl:verify-certificate true
+$SSL_SETTINGS
 mirror --reverse --delete --verbose --parallel=4 \
        --exclude-glob .well-known/ \
        out/ "$DIR"

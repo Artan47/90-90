@@ -32,6 +32,19 @@ out/
 
 ---
 
+## 1b. Avez-vous un hébergement, ou seulement le domaine ?
+
+Acheter `sadite.ch` ne donne pas automatiquement un serveur web. Dans le
+Manager, regardez si un **Hébergement Web** figure dans vos produits.
+
+| Offre | Convient ? | Pourquoi |
+| --- | --- | --- |
+| **Starter** (offerte avec le domaine) | ⚠️ à vérifier | 10 Mo (le site en fait 1,2) et 1 Go de trafic par mois suffisent. Mais elle n'accepte que le **FTP simple, sans TLS**, et la disponibilité du certificat SSL n'y est pas garantie. **Sans HTTPS, la création de compte échoue** : WebCrypto n'existe pas hors contexte sécurisé. |
+| **Hébergement Web** (payant) | ✅ | FTP/SFTP, SSH, certificat Let's Encrypt inclus. |
+| **Domaine seul + hébergeur statique externe** | ✅ | Cloudflare Pages, Netlify ou Vercel hébergent gratuitement un site statique avec HTTPS automatique. Le domaine reste chez Infomaniak : on n'y change que les enregistrements DNS. |
+
+Le point décisif n'est pas la taille du site, c'est **le HTTPS**.
+
 ## 2a. La méthode rapide : le script fourni
 
 ```bash
