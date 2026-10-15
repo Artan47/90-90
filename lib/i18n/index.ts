@@ -60,12 +60,41 @@ export function detectLocale(
  */
 export const t: Messages = sq;
 
-/** Remplace les jetons {clé} d'un libellé. */
+/**
+ * Remplace les jetons d'un libellé.
+ *
+ *   {clé}                  → la valeur
+ *   {clé#singulier#pluriel} → la forme accordée au nombre `clé`
+ *
+ * L'accord suit les règles réelles de la langue via Intl.PluralRules, et
+ * non un `n === 1` approximatif : le français met « 0 jour » au singulier,
+ * l'albanais met « 0 ditë » au pluriel. Sans ça, l'application afficherait
+ * « 1 jours » et « 1 séjours » partout.
+ */
 export function fill(
   template: string,
   values: Record<string, string | number>,
+  locale: Locale = DEFAULT_LOCALE,
 ): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    key in values ? String(values[key]) : match,
-  );
+  return template
+    .replace(/\{(\w+)#([^#{}]*)#([^#{}]*)\}/g, (match, key: string, one: string, other: string) => {
+      if (!(key in values)) return match;
+      const n = Number(values[key]);
+      if (!Number.isFinite(n)) return match;
+      return pluralRules(locale).select(n) === "one" ? one : other;
+    })
+    .replace(/\{(\w+)\}/g, (match, key: string) =>
+      key in values ? String(values[key]) : match,
+    );
+}
+
+const RULES = new Map<Locale, Intl.PluralRules>();
+
+function pluralRules(locale: Locale): Intl.PluralRules {
+  let rules = RULES.get(locale);
+  if (!rules) {
+    rules = new Intl.PluralRules(locale);
+    RULES.set(locale, rules);
+  }
+  return rules;
 }

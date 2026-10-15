@@ -207,6 +207,35 @@ npm run build        # export statique dans out/ + précache du service worker
 npm run verify       # build + tests + vérification navigateur des critères
 ```
 
+### Audit par référence indépendante
+
+Le moteur a été confronté à une **seconde implémentation écrite
+indépendamment** (présence jour par jour sur des numéros de jour depuis
+l'epoch, fenêtre glissante par somme directe, durée maximale par force
+brute) sur des historiques aléatoires incluant séjours ouverts, séjours
+exempts et pays à adhésion datée : **plus de 4 000 comparaisons, aucun
+écart**.
+
+Trois bugs réels ont été trouvés et corrigés par cette démarche :
+
+1. **Projections faussées par un séjour en cours.** Un séjour sans date de
+   sortie était réputé courir jusqu'au jour sondé ; en sondant des dates de
+   plus en plus lointaines, il grossissait indéfiniment, la recherche
+   n'aboutissait jamais et la fonction renvoyait sa **borne de sécurité
+   comme si c'était une vraie date** — jusqu'à 7 mois d'écart affichés à
+   l'utilisateur. `closeOpenStays()` fixe désormais l'hypothèse
+   explicitement (« on sort à la date de référence »), et l'interface
+   l'affiche au lieu de la sous-entendre.
+2. **Borne de recherche trop courte.** 400 itérations ne suffisaient pas sur
+   un historique déjà largement en dépassement. `fullResetDate` est
+   maintenant calculée **exactement** (`dernier jour compté + 180`), sans
+   boucle ; `earliestReentry` borne sa recherche sur la donnée, plus sur une
+   constante.
+3. **Accords grammaticaux.** 22 libellés affichaient « 1 jours »,
+   « 1 séjours ». `fill()` accorde désormais via `Intl.PluralRules`, qui
+   connaît les vraies règles : le français met « 0 jour » au singulier,
+   l'albanais met « 0 ditë » au pluriel.
+
 ### Tests
 
 `npm test` exécute la suite sous **UTC**, **Pacific/Kiritimati (UTC+14)** et

@@ -10,10 +10,9 @@ import { statusOn, MAX_DAYS, currentStay } from "@/lib/schengen";
 import { formatDate, diffDays, todayIso } from "@/lib/date";
 import { runReminders } from "@/lib/notifications";
 import { InstallPrompt } from "@/components/InstallPrompt";
-import { fill } from "@/lib/i18n";
 
 export default function HomePage() {
-  const { stays, today, ready, addStay, updateStay, t, locale } = useStore();
+  const { stays, today, ready, addStay, updateStay, t, fmt, locale } = useStore();
   const [toast, setToast] = useState<string | null>(null);
 
   const status = useMemo(() => statusOn(stays, today), [stays, today]);
@@ -76,16 +75,16 @@ export default function HomePage() {
             {status.remaining}
           </span>
           <span className="mt-0.5 text-xs font-medium muted">
-            {status.remaining === 1 ? t.home.dayLeft : t.home.daysLeft}
+            {fmt(t.home.daysLeft, { n: status.remaining })}
           </span>
         </Ring>
 
         <div className="mt-3 space-y-0.5 text-center">
           <p className="tnum text-sm font-medium">
-            {fill(t.home.usedOf, { used: status.used })}
+            {fmt(t.home.usedOf, { used: status.used })}
           </p>
           <p className="tnum text-xs muted">
-            {fill(t.home.window, {
+            {fmt(t.home.window, {
               from: formatDate(status.windowFrom),
               to: formatDate(status.windowTo),
             })}
@@ -96,10 +95,10 @@ export default function HomePage() {
       {overstay ? (
         <Card className="border-[var(--color-bad)] bg-[var(--color-bad-soft)] text-[#7f1d1d]">
           <p className="font-bold">
-            ⚠️ {fill(t.home.overstay, { n: overstay.daysOver ?? 0 })}
+            ⚠️ {fmt(t.home.overstay, { n: overstay.daysOver ?? 0 })}
           </p>
           <p className="mt-1 text-sm">
-            {fill(t.home.overstayFrom, {
+            {fmt(t.home.overstayFrom, {
               date: formatDate(overstay.firstOverflowDate ?? ""),
             })}
           </p>
@@ -109,14 +108,12 @@ export default function HomePage() {
       {status.inside && status.mustLeaveBy ? (
         <Card className="border-[var(--color-warn)]">
           <p className="text-base font-bold">
-            🛫 {fill(t.home.insideBanner, { date: formatDate(status.mustLeaveBy) })}
+            🛫 {fmt(t.home.insideBanner, { date: formatDate(status.mustLeaveBy) })}
           </p>
           <p className="mt-1 text-sm muted">
             {daysInsideLeft <= 0
               ? t.home.insideToday
-              : daysInsideLeft === 1
-                ? t.home.insideCountdownOne
-                : fill(t.home.insideCountdown, { n: daysInsideLeft })}
+              : fmt(t.home.insideCountdown, { n: daysInsideLeft })}
           </p>
         </Card>
       ) : (
@@ -124,7 +121,7 @@ export default function HomePage() {
           {status.maxStay.days > 0 ? (
             <p className="text-sm font-semibold">
               ✅{" "}
-              {fill(t.home.outsideCanEnter, {
+              {fmt(t.home.outsideCanEnter, {
                 date: formatDate(status.maxStay.lastPossibleExit),
                 n: status.maxStay.days,
               })}
@@ -132,13 +129,13 @@ export default function HomePage() {
           ) : (
             <p className="text-sm font-semibold text-[var(--color-bad)]">
               ⛔{" "}
-              {fill(t.home.outsideBlocked, {
+              {fmt(t.home.outsideBlocked, {
                 date: formatDate(status.earliestReentry),
               })}
             </p>
           )}
           <p className="mt-1 text-xs muted">
-            {fill(t.home.fullReset, { date: formatDate(status.fullReset) })}
+            {fmt(t.home.fullReset, { date: formatDate(status.fullReset) })}
           </p>
         </Card>
       )}
@@ -168,7 +165,7 @@ export default function HomePage() {
         ) : (
           <>
             <p className="tnum mt-1 font-semibold">
-              {fill(t.home.summaryStays, {
+              {fmt(t.home.summaryStays, {
                 n: status.summary.stayCount,
                 days: status.summary.totalDays,
               })}
@@ -197,7 +194,7 @@ export default function HomePage() {
               <li key={trip.stay.id} className="flex items-start gap-2">
                 <span aria-hidden>{trip.ok ? "✅" : "⛔"}</span>
                 <span className={trip.ok ? "" : "font-semibold text-[var(--color-bad)]"}>
-                  {fill(t.home.plannedTrip, {
+                  {fmt(t.home.plannedTrip, {
                     from: formatDate(trip.entry),
                     to: formatDate(trip.exit),
                     n: trip.days,
@@ -209,7 +206,7 @@ export default function HomePage() {
 
           {status.planned.anyOverflow ? (
             <p className="tnum mt-3 rounded-xl bg-[var(--color-bad-soft)] px-3 py-2 text-sm font-semibold text-[#7f1d1d]">
-              {fill(t.home.plannedBad, {
+              {fmt(t.home.plannedBad, {
                 date: formatDate(status.planned.firstOverflowDate ?? ""),
                 n: status.planned.daysOver,
               })}
@@ -222,7 +219,7 @@ export default function HomePage() {
 
           {status.planned.lastExit ? (
             <p className="tnum mt-2 text-sm muted">
-              {fill(t.home.plannedAfter, {
+              {fmt(t.home.plannedAfter, {
                 date: formatDate(status.planned.lastExit),
                 n: status.planned.remainingAfter,
               })}

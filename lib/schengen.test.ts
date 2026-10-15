@@ -5,7 +5,7 @@ import {
   windowStart, windowEnd, countedDays, usedOn, remainingOn, isCompliantOn,
   maxStayFrom, earliestReentry, fullResetDate, simulate, timeline, validate,
   stayDays, currentStay, mustLeaveBy, statusOn, materializePlanned,
-  MAX_ITERATIONS, plannedOutlook, summarize,
+  MAX_ITERATIONS, plannedOutlook, summarize, suggestEntryFor, closeOpenStays,
 } from "./schengen";
 import { inclusiveDays, addDays } from "./date";
 
@@ -435,18 +435,38 @@ describe("countedDays — robustesse", () => {
 
 
 describe("bornes des boucles jour par jour (jamais d'infini)", () => {
-  it("earliestReentry rend la main même si aucun jour ne se libère", () => {
-    // Séjour ouvert : il consomme chaque jour examiné, le quota ne se
-    // libère donc jamais. La boucle doit s'arrêter à MAX_ITERATIONS.
+  it("earliestReentry donne toujours une vraie date, jamais la borne", () => {
+    // Séjour ouvert depuis longtemps : la fonction suppose qu'on sort le
+    // jour de référence, et doit donc trouver une date réelle.
     const open = [stay("2026-01-01", null)];
     const r = earliestReentry(open, "2026-06-01");
-    expect(r).toBe(addDays("2026-06-01", MAX_ITERATIONS));
+    expect(r).not.toBe(addDays("2026-06-01", MAX_ITERATIONS));
+    expect(remainingOn(closeOpenStays(open, "2026-06-01"), r)).toBeGreaterThanOrEqual(1);
   });
 
-  it("fullResetDate rend la main même si le quota ne se vide jamais", () => {
+  it("fullResetDate donne toujours une vraie date, jamais la borne", () => {
     const open = [stay("2026-01-01", null)];
     const r = fullResetDate(open, "2026-06-01");
-    expect(r).toBe(addDays("2026-06-01", MAX_ITERATIONS));
+    expect(r).not.toBe(addDays("2026-06-01", MAX_ITERATIONS));
+    expect(usedOn(closeOpenStays(open, "2026-06-01"), r)).toBe(0);
+  });
+
+  it("la borne de sécurité n'est atteinte pour AUCUN historique plausible", () => {
+    // Balayage : séjours ouverts, fermés, longs, courts, exempts.
+    const cases: Stay[][] = [
+      [],
+      [stay("2026-01-01", null)],
+      [stay("2026-01-10", "2026-04-09")],
+      [stay("2020-01-01", null)],
+      [stay("2026-01-01", "2026-12-31")],
+      [stay("2026-01-01", null), stay("2025-01-01", "2025-06-30")],
+    ];
+    for (const history of cases) {
+      for (const from of ["2026-01-01", "2026-06-01", "2026-12-31"]) {
+        expect(earliestReentry(history, from)).not.toBe(addDays(from, MAX_ITERATIONS));
+        expect(fullResetDate(history, from)).not.toBe(addDays(from, MAX_ITERATIONS));
+      }
+    }
   });
 
   it("maxStayFrom ne dépasse jamais MAX_ITERATIONS", () => {
@@ -622,6 +642,126 @@ describe("statusOn — intègre le résumé et la projection", () => {
     expect(st.planned.anyOverflow).toBe(false);
     // Le compteur du jour ignore toujours les voyages planifiés.
     expect(st.used).toBe(0);
+  });
+});
+
+describe("séjour en cours — les projections supposent qu'on sort", () => {
+  // Régression : un séjour sans date de sortie était prolongé à chaque jour
+  // sondé, la recherche n'aboutissait jamais, et la fonction renvoyait sa
+  // borne de sécurité (from + 400) comme si c'était une vraie date.
+  const open = [stay("2026-08-27", null)];
+  const today = "2026-08-27";
+
+  it("fullResetDate ne renvoie JAMAIS la borne de sécurité", () => {
+    const reset = fullResetDate(open, today);
+    expect(reset).toBe("2027-02-23");
+    expect(reset).not.toBe(addDays(today, MAX_ITERATIONS));
+    // Et c'est bien le premier jour à zéro.
+    expect(usedOn(closeOpenStays(open, today), reset)).toBe(0);
+    expect(usedOn(closeOpenStays(open, today), addDays(reset, -1))).toBe(1);
+  });
+
+  it("earliestReentry reste cohérent avec un séjour ouvert", () => {
+    expect(earliestReentry(open, today)).toBe(today);
+    // Quota épuisé et toujours à l'intérieur : la date de retour doit
+    // rester une vraie date, pas la borne.
+    const long = [stay("2026-06-01", null)];
+    const r = earliestReentry(long, "2026-08-29"); // 90 jours au 29.08
+    expect(r).not.toBe(addDays("2026-08-29", MAX_ITERATIONS));
+    expect(remainingOn(closeOpenStays(long, "2026-08-29"), r)).toBeGreaterThanOrEqual(1);
+  });
+
+  it("mustLeaveBy garde l'hypothèse inverse : on reste", () => {
+    // Ici la question est « jusqu'à quand puis-je rester », le séjour
+    // ouvert doit donc bien continuer de courir.
+    expect(mustLeaveBy(open, today)).toBe("2026-11-24");
+    expect(inclusiveDays("2026-08-27", "2026-11-24")).toBe(90);
+  });
+
+  it("maxStayFrom n'est pas faussé par un séjour ouvert", () => {
+    expect(maxStayFrom(open, today).days).toBe(90);
+  });
+
+  it("closeOpenStays ne touche qu'aux séjours ouverts déjà commencés", () => {
+    const mixed = [
+      stay("2026-01-01", "2026-01-10"),
+      stay("2026-08-01", null),
+      stay("2026-12-01", null), // entrée future : pas encore commencée
+    ];
+    const closed = closeOpenStays(mixed, "2026-08-27");
+    expect(closed[0]!.exit).toBe("2026-01-10");
+    expect(closed[1]!.exit).toBe("2026-08-27");
+    expect(closed[2]!.exit).toBeNull();
+  });
+});
+
+describe("suggestEntryFor — « je veux rester N jours, à partir de quand ? »", () => {
+  it("sans historique, c'est possible tout de suite", () => {
+    const r = suggestEntryFor([], "2026-01-01", 55);
+    expect(r.immediate).toBe(true);
+    expect(r.entry).toBe("2026-01-01");
+    expect(r.exit).toBe("2026-02-24");
+    expect(inclusiveDays(r.entry!, r.exit!)).toBe(55);
+    expect(r.waitDays).toBe(0);
+  });
+
+  it("propose une date plus tardive quand la date voulue ne suffit pas", () => {
+    // 80 jours consommés récemment : impossible de rester 55 jours tout de suite.
+    const history = [stay("2026-06-01", "2026-08-19")]; // 80 j
+    const from = "2026-08-27";
+    expect(maxStayFrom(history, from).days).toBeLessThan(55);
+
+    const r = suggestEntryFor(history, from, 55);
+    expect(r.entry).not.toBeNull();
+    expect(r.immediate).toBe(false);
+    expect(r.waitDays).toBeGreaterThan(0);
+    expect(inclusiveDays(r.entry!, r.exit!)).toBe(55);
+
+    // La date proposée tient vraiment, et la veille ne tiendrait pas.
+    expect(simulate(history, { entry: r.entry!, exit: r.exit! }).ok).toBe(true);
+    const earlier = addDays(r.entry!, -1);
+    expect(simulate(history, { entry: earlier, exit: addDays(earlier, 54) }).ok).toBe(false);
+  });
+
+  it("donne la PREMIÈRE date possible, pas une date quelconque", () => {
+    const history = [stay("2026-06-01", "2026-08-19")];
+    const r = suggestEntryFor(history, "2026-08-27", 30);
+    for (let i = 0; i < r.waitDays; i++) {
+      const d = addDays("2026-08-27", i);
+      expect(maxStayFrom(history, d).days).toBeLessThan(30);
+    }
+    expect(maxStayFrom(history, r.entry!).days).toBeGreaterThanOrEqual(30);
+  });
+
+  it("plafonne la demande à 90 jours", () => {
+    const r = suggestEntryFor([], "2026-01-01", 200);
+    expect(r.wanted).toBe(90);
+    expect(inclusiveDays(r.entry!, r.exit!)).toBe(90);
+  });
+
+  it("accepte 90 jours pile après une longue absence", () => {
+    const history = [stay("2026-01-10", "2026-04-09")];
+    const r = suggestEntryFor(history, "2026-04-10", 90);
+    expect(r.entry).toBe("2026-07-09"); // dès que le crédit recommence à revenir
+    expect(simulate(history, { entry: r.entry!, exit: r.exit! }).ok).toBe(true);
+  });
+
+  it("expose le maximum atteignable à la date demandée", () => {
+    const history = [stay("2026-06-01", "2026-08-19")];
+    const r = suggestEntryFor(history, "2026-08-27", 55);
+    expect(r.maxFromNow).toBe(maxStayFrom(history, "2026-08-27").days);
+  });
+
+  it("ignore les voyages déjà planifiés", () => {
+    const s = [stay("2026-09-01", "2026-10-30", { planned: true })];
+    expect(suggestEntryFor(s, "2026-08-27", 55).immediate).toBe(true);
+  });
+
+  it("tient compte d'un séjour en cours", () => {
+    const s = [stay("2026-06-01", null)];
+    const r = suggestEntryFor(s, "2026-08-27", 55);
+    expect(r.entry).not.toBeNull();
+    expect(inclusiveDays(r.entry!, r.exit!)).toBe(55);
   });
 });
 

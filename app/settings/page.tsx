@@ -13,12 +13,12 @@ import {
   notificationSupport, requestNotifications, runReminders,
   type NotificationSupport,
 } from "@/lib/notifications";
-import { fill, LOCALE_LABELS, LOCALE_ORDER } from "@/lib/i18n";
+import { LOCALE_LABELS, LOCALE_ORDER } from "@/lib/i18n";
 
 export default function SettingsPage() {
   const {
     data, stays, today, ready, storageOk, setProfile, replaceAll, clearAll,
-    t, locale, setLocale,
+    t, fmt, locale, setLocale,
   } = useStore();
   const [toast, setToast] = useState<string | null>(null);
   const [notif, setNotif] = useState<NotificationSupport>("default");
@@ -94,7 +94,7 @@ export default function SettingsPage() {
       {stays.length >= 3 ? (
         <Card className="border-[var(--color-warn)]">
           <p className="text-sm font-medium">
-            💾 {fill(t.settings.exportReminder, { n: stays.length })}
+            💾 {fmt(t.settings.exportReminder, { n: stays.length })}
           </p>
         </Card>
       ) : null}
@@ -151,7 +151,7 @@ export default function SettingsPage() {
         ) : null}
         {passportTooShort && plannedExit ? (
           <p className="rounded-xl bg-[var(--color-warn-soft)] px-3 py-2 text-sm text-[#7c2d12]">
-            {fill(t.settings.passportExpiringSoon, { date: formatDate(plannedExit) })}
+            {fmt(t.settings.passportExpiringSoon, { date: formatDate(plannedExit) })}
           </p>
         ) : null}
       </Card>
@@ -235,7 +235,7 @@ export default function SettingsPage() {
           danger={false}
           onConfirm={() => {
             replaceAll(pendingImport);
-            flash(fill(t.settings.imported, { n: pendingImport.stays.length }));
+            flash(fmt(t.settings.imported, { n: pendingImport.stays.length }));
             setPendingImport(null);
           }}
           onCancel={() => setPendingImport(null)}

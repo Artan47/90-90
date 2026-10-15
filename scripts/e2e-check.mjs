@@ -208,7 +208,9 @@ await page.evaluate(() => {
 await page.goto(BASE, { waitUntil: "networkidle" });
 await page.waitForTimeout(700);
 const home = await page.locator("body").innerText();
-check("accueil : résumé des séjours", /1 qëndrime të regjistruara · 85 ditë/.test(home));
+// L'accord doit être au singulier pour 1 : c'était « 1 qëndrime ».
+check("accueil : résumé des séjours (accord au singulier)",
+  /1 qëndrim i regjistruar · 85 ditë/.test(home));
 check("accueil : voyage planifié listé", /01\.09\.2026 → 10\.09\.2026 \(10 ditë\)/.test(home));
 check("accueil : dépassement détecté au bon jour",
   /06\.09\.2026/.test(home) && /5 ditë tepër/.test(home));
@@ -227,6 +229,60 @@ await page.waitForTimeout(700);
 const home2 = await page.locator("body").innerText();
 check("accueil : voyage planifié accepté", /brenda kufirit/.test(home2));
 check("accueil : solde après les voyages planifiés", /10\.09\.2026.*70 ditë|70 ditë.*10\.09\.2026/s.test(home2));
+
+// ── Accords grammaticaux ──────────────────────────────────────────────
+await page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.profile.locale = "fr";
+  d.stays = [{ id: "a", entry: "2026-08-27", exit: "2026-08-27", country: "DE" }];
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForTimeout(700);
+const one = await page.locator("body").innerText();
+check("accord : « 1 séjour enregistré », pas « 1 séjours »",
+  /1 séjour enregistré/.test(one) && !/1 séjours/.test(one));
+check("accord : « 1 jour »", /· 1 jour\b/.test(one) && !/· 1 jours/.test(one));
+const ringPlural = await page.locator("main section").first().locator("span").nth(1).innerText();
+check("accord : « jours restants » au pluriel pour 89", ringPlural.trim() === "jours restants", ringPlural.trim());
+
+await page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.stays = [{ id: "a", entry: "2026-05-31", exit: "2026-08-27", country: "DE" }]; // 89 j
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(700);
+const ringOne = await page.locator("main section").first().locator("span").nth(1).innerText();
+const ringOneN = await page.locator("main section").first().locator("span").nth(0).innerText();
+check("accord : « jour restant » au singulier pour 1",
+  ringOneN.trim() === "1" && ringOne.trim() === "jour restant", `${ringOneN.trim()} ${ringOne.trim()}`);
+
+// ── Planificateur : « je veux rester N jours » ────────────────────────
+await page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.stays = [{ id: "h", entry: "2026-06-01", exit: "2026-08-19", country: "DE" }]; // 80 j
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
+await page.goto(`${BASE}/plan/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+await page.getByRole("button", { name: /Je veux rester X jours/ }).click();
+await page.waitForTimeout(400);
+await page.locator('input[type="range"]').fill("55");
+await page.waitForTimeout(600);
+const want = await page.locator("body").innerText();
+check("planificateur : mode « je veux rester N jours »", /55 jours en entrant le/.test(want));
+check("planificateur : propose une date d'attente", /Attends \d+ jours/.test(want));
+check("planificateur : dit combien de jours seulement à la date demandée",
+  /tu ne peux rester que \d+ jours/.test(want));
+
+// la date proposée doit réellement passer le verdict
+const proposed = (await page.locator("main section p.tnum").first().innerText()).trim();
+await page.getByRole("button", { name: /Utiliser cette date/ }).first().click();
+await page.waitForTimeout(700);
+const verdict = await page.locator("body").innerText();
+check(`planificateur : la date proposée (${proposed}) est validée`,
+  /Ce voyage est autorisé/.test(verdict) && /55 jours/.test(verdict));
 
 // ── Changement de langue ──────────────────────────────────────────────
 // On remet les 4 séjours du TEST B : la section ci-dessus les avait

@@ -3,8 +3,7 @@
 import { Card, PageTitle } from "@/components/ui";
 import { COUNTRIES, LAST_VERIFIED, SCHENGEN_STATE_COUNT } from "@/lib/schengen-membership";
 import { formatDate } from "@/lib/date";
-import { fill } from "@/lib/i18n";
-import { useT } from "@/components/Store";
+import { useT, useFmt } from "@/components/Store";
 
 const EES_URL = "https://travel-europe.europa.eu/ees/check-how-long-you-can-stay";
 const CALC_URL =
@@ -12,6 +11,7 @@ const CALC_URL =
 
 export default function AboutPage() {
   const t = useT();
+  const fmt = useFmt();
   const members = COUNTRIES.filter((c) => c.since !== null);
   // On ne montre que les cas contre-intuitifs : ceux que l'on croit à tort
   // dans Schengen. Les pays tiers évidents n'ont pas besoin d'explication.
@@ -89,7 +89,7 @@ export default function AboutPage() {
           {t.about.membershipTitle} ({SCHENGEN_STATE_COUNT})
         </h2>
         <p className="text-sm muted">
-          {fill(t.about.membershipBody, { date: formatDate(LAST_VERIFIED) })}
+          {fmt(t.about.membershipBody, { date: formatDate(LAST_VERIFIED) })}
         </p>
         <ul className="flex flex-wrap gap-x-3 gap-y-1 text-sm">
           {members.map((c) => (

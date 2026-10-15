@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useStore, useT } from "@/components/Store";
+import { useStore, useT, useFmt } from "@/components/Store";
 import { StayForm, type StayDraft } from "@/components/StayForm";
 import { Badge, Button, Card, PageTitle } from "@/components/ui";
 import { Confirm } from "@/components/Confirm";
@@ -9,10 +9,9 @@ import { getCountry, countsEver } from "@/lib/schengen-membership";
 import { countedDays, stayDays, validate } from "@/lib/schengen";
 import { compareDates, formatDate } from "@/lib/date";
 import type { Stay } from "@/lib/types";
-import { fill } from "@/lib/i18n";
 
 export default function StaysPage() {
-  const { stays, today, addStay, updateStay, removeStay, ready, t } = useStore();
+  const { stays, today, addStay, updateStay, removeStay, ready, t, fmt } = useStore();
   const [editing, setEditing] = useState<Stay | null>(null);
   const [adding, setAdding] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<Stay | null>(null);
@@ -63,7 +62,7 @@ export default function StaysPage() {
       )}
 
       {stays.length > 0 ? (
-        <p className="tnum text-sm muted">{fill(t.stays.total, { n: totalDays })}</p>
+        <p className="tnum text-sm muted">{fmt(t.stays.total, { n: totalDays })}</p>
       ) : null}
 
       {real.length === 0 && planned.length === 0 ? (
@@ -113,7 +112,7 @@ export default function StaysPage() {
       {pendingDelete ? (
         <Confirm
           title={t.stays.deleteTitle}
-          body={fill(t.stays.deleteBody, {
+          body={fmt(t.stays.deleteBody, {
             from: formatDate(pendingDelete.entry),
             to: pendingDelete.exit ? formatDate(pendingDelete.exit) : "…",
           })}
@@ -144,6 +143,7 @@ function StayRow({
   onMarkExit: () => void;
 }) {
   const t = useT();
+  const fmt = useFmt();
   const country = getCountry(stay.country);
   const total = stayDays(stay, today);
   // Jours réellement imputés au quota : diffère du total si le pays n'était
@@ -163,10 +163,10 @@ function StayRow({
           <p className="mt-0.5 text-sm muted">
             {country?.name ?? stay.country} ·{" "}
             <span className="tnum">
-              {total === 1 ? t.stays.dayOne : fill(t.stays.days, { n: total })}
+              {fmt(t.stays.days, { n: total })}
             </span>
             {counted !== total ? (
-              <span className="tnum"> · {fill(t.stays.counted, { n: counted })}</span>
+              <span className="tnum"> · {fmt(t.stays.counted, { n: counted })}</span>
             ) : null}
           </p>
           {stay.note ? <p className="mt-1 text-sm muted">“{stay.note}”</p> : null}

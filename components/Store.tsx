@@ -15,7 +15,7 @@ import { emptyData } from "@/lib/types";
 import { loadData, saveData, newId, isStorageAvailable } from "@/lib/storage";
 import { todayIso, type IsoDate } from "@/lib/date";
 import {
-  detectLocale, getMessages, DEFAULT_LOCALE,
+  detectLocale, getMessages, fill, DEFAULT_LOCALE,
   type Locale, type Messages,
 } from "@/lib/i18n";
 
@@ -27,6 +27,8 @@ interface StoreValue {
   setLocale: (locale: Locale) => void;
   /** Libellés de la langue effective. */
   t: Messages;
+  /** Remplit les jetons d'un libellé en accordant au nombre et à la langue. */
+  fmt: (template: string, values: Record<string, string | number>) => string;
   ready: boolean;
   storageOk: boolean;
   stays: Stay[];
@@ -101,6 +103,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setLocale: (next: Locale) =>
         persist({ ...data, profile: { ...data.profile, locale: next } }),
       t: messages,
+      fmt: (template, values) => fill(template, values, locale),
       ready,
       storageOk,
       stays: data.stays,
@@ -136,4 +139,9 @@ export function useStore(): StoreValue {
  */
 export function useT(): Messages {
   return useStore().t;
+}
+
+/** Formateur accordé à la langue courante. */
+export function useFmt(): StoreValue["fmt"] {
+  return useStore().fmt;
 }

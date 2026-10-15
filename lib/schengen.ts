@@ -25,7 +25,7 @@
 
 import {
   type IsoDate,
-  addDays, eachDay, isAfter, isBefore, isIsoDate, isSameOrBefore,
+  addDays, diffDays, eachDay, isAfter, isBefore, isIsoDate, isSameOrBefore,
   maxDate, minDate, inclusiveDays,
 } from "./date";
 import { isSchengenOn } from "./schengen-membership";
@@ -161,6 +161,83 @@ export function mustLeaveBy(stays: Stay[], day: IsoDate): IsoDate | null {
 }
 
 // ──────────────────────────────────────────────────────────────────────
+// Index de présence — cœur rapide des projections
+// ──────────────────────────────────────────────────────────────────────
+
+/**
+ * Ferme les séjours encore ouverts à la date `day`.
+ *
+ * Indispensable pour toute PROJECTION : un séjour sans date de sortie est
+ * réputé courir jusqu'au jour examiné, si bien qu'en sondant des dates de
+ * plus en plus lointaines on ferait grossir le séjour à l'infini et on
+ * conclurait, à tort, qu'aucun jour ne se libère jamais.
+ */
+export function closeOpenStays(stays: Stay[], day: IsoDate): Stay[] {
+  return stays.map((s) =>
+    s.exit === null && isIsoDate(s.entry) && isSameOrBefore(s.entry, day)
+      ? { ...s, exit: day }
+      : s,
+  );
+}
+
+/**
+ * Présence jour par jour, en sommes préfixées.
+ *
+ * Permet de répondre en temps constant à « combien de jours consommés le
+ * jour D ? », au lieu de reparcourir tous les séjours. C'est ce qui rend
+ * possible la recherche de date (qui essaie des centaines de dates
+ * d'entrée, chacune sur des centaines de jours).
+ */
+interface PresenceIndex {
+  /** Premier jour indexé (début de fenêtre du premier jour utile). */
+  origin: IsoDate;
+  /** prefix[i + 1] = nombre de jours présents dans [origin, origin + i]. */
+  prefix: Int32Array;
+  length: number;
+}
+
+function buildIndex(stays: Stay[], from: IsoDate, to: IsoDate): PresenceIndex {
+  const origin = windowStart(from);
+  const length = Math.max(0, diffDays(origin, to) + 1);
+  const prefix = new Int32Array(length + 1);
+  if (length === 0) return { origin, prefix, length };
+
+  const present = countedDays(stays, origin, to);
+  let running = 0;
+  for (let i = 0; i < length; i++) {
+    if (present.has(addDays(origin, i))) running++;
+    prefix[i + 1] = running;
+  }
+  return { origin, prefix, length };
+}
+
+/** Somme des jours présents dans [a, b] (indices, bornes incluses). */
+function rangeSum(index: PresenceIndex, a: number, b: number): number {
+  const lo = Math.max(0, a);
+  const hi = Math.min(index.length - 1, b);
+  if (hi < lo) return 0;
+  return (index.prefix[hi + 1] ?? 0) - (index.prefix[lo] ?? 0);
+}
+
+/**
+ * Jours consommés le jour d'indice `i`, si l'on ajoute un séjour continu
+ * commençant à l'indice `tripStart`.
+ *
+ * Les jours du séjour simulé déjà présents dans l'historique ne sont
+ * comptés qu'une fois : c'est la règle de dédoublonnage, appliquée ici par
+ * soustraction plutôt que par un Set.
+ */
+function usedAtIndex(index: PresenceIndex, i: number, tripStart: number): number {
+  const windowFrom = i - (WINDOW - 1);
+  const history = rangeSum(index, windowFrom, i);
+  if (tripStart > i) return history;
+  const tripFrom = Math.max(tripStart, windowFrom);
+  const tripDays = i - tripFrom + 1;
+  const alreadyCounted = rangeSum(index, tripFrom, i);
+  return history + (tripDays - alreadyCounted);
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // Projection
 // ──────────────────────────────────────────────────────────────────────
 
@@ -186,26 +263,88 @@ export interface MaxStay {
  * la veille de l'entrée : il n'existe aucun séjour légal à cette date.
  */
 export function maxStayFrom(stays: Stay[], entry: IsoDate): MaxStay {
-  const probe: Stay = {
-    id: "__probe__",
-    entry,
-    exit: entry,
-    country: "DE", // pays Schengen de longue date : le cas le plus contraignant
-  };
-  const real = stays.filter((s) => !s.planned);
+  const real = closeOpenStays(
+    stays.filter((s) => !s.planned),
+    addDays(entry, -1),
+  );
+  const horizon = addDays(entry, MAX_ITERATIONS);
+  const index = buildIndex(real, entry, horizon);
+  const base = diffDays(index.origin, entry);
 
   let days = 0;
   let lastPossibleExit = addDays(entry, -1);
 
   for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const candidateExit = addDays(entry, i);
-    const withTrip = [...real, { ...probe, exit: candidateExit }];
-    if (usedOn(withTrip, candidateExit) > MAX_DAYS) break;
+    if (usedAtIndex(index, base + i, base) > MAX_DAYS) break;
     days = i + 1;
-    lastPossibleExit = candidateExit;
+    lastPossibleExit = addDays(entry, i);
   }
 
   return { lastPossibleExit, nights: Math.max(0, days - 1), days };
+}
+
+/**
+ * Première date d'entrée, à partir de `from`, permettant de rester
+ * `wanted` jours d'affilée.
+ *
+ * C'est la question que se pose réellement un voyageur : « je veux venir
+ * 55 jours, à partir de quand est-ce possible ? » Plutôt que de lui dire
+ * seulement que sa date ne passe pas, on lui donne la date qui passe.
+ */
+export interface DurationSuggestion {
+  /** Jours souhaités (borné à 90, le maximum légal). */
+  wanted: number;
+  /** Première date d'entrée qui permet `wanted` jours, si elle existe. */
+  entry: IsoDate | null;
+  /** Dernier jour de ce séjour. */
+  exit: IsoDate | null;
+  /** Jours d'attente depuis `from`. */
+  waitDays: number;
+  /** Déjà possible sans attendre ? */
+  immediate: boolean;
+  /** Le maximum atteignable en entrant à `from`, pour comparaison. */
+  maxFromNow: number;
+}
+
+export function suggestEntryFor(
+  stays: Stay[],
+  from: IsoDate,
+  wantedDays: number,
+): DurationSuggestion {
+  const wanted = Math.max(1, Math.min(MAX_DAYS, Math.round(wantedDays)));
+  const real = closeOpenStays(stays.filter((s) => !s.planned), from);
+  const maxFromNow = maxStayFrom(real, from).days;
+
+  const horizon = addDays(from, MAX_ITERATIONS + WINDOW);
+  const index = buildIndex(real, from, horizon);
+  const originToFrom = diffDays(index.origin, from);
+
+  for (let offset = 0; offset < MAX_ITERATIONS; offset++) {
+    const start = originToFrom + offset;
+    let fits = true;
+    for (let k = 0; k < wanted; k++) {
+      if (usedAtIndex(index, start + k, start) > MAX_DAYS) {
+        fits = false;
+        break;
+      }
+    }
+    if (fits) {
+      const entry = addDays(from, offset);
+      return {
+        wanted,
+        entry,
+        exit: addDays(entry, wanted - 1),
+        waitDays: offset,
+        immediate: offset === 0,
+        maxFromNow,
+      };
+    }
+  }
+
+  return {
+    wanted, entry: null, exit: null, waitDays: 0,
+    immediate: false, maxFromNow,
+  };
 }
 
 /**
@@ -214,11 +353,41 @@ export function maxStayFrom(stays: Stay[], entry: IsoDate): MaxStay {
  * tout premier jour consommé sort de la fenêtre — pas après 90 jours dehors.
  */
 export function earliestReentry(stays: Stay[], from: IsoDate): IsoDate {
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
+  // Un séjour encore ouvert est réputé se terminer à `from` : la question
+  // posée est « quand puis-je REVENIR », donc après être sorti. Sans ça, le
+  // séjour ouvert grossirait avec chaque jour sondé et aucune date ne
+  // serait jamais trouvée.
+  const closed = closeOpenStays(stays, from);
+  // La fenêtre est forcément vide à partir de `lastCountedDay + 180` : on
+  // borne la recherche là-dessus, et non sur un nombre d'itérations fixe
+  // qui pouvait être trop court sur un historique déjà en dépassement.
+  const limit = searchLimit(closed, from);
+  for (let i = 0; i <= limit; i++) {
     const day = addDays(from, i);
-    if (remainingOn(stays, day) >= 1) return day;
+    if (remainingOn(closed, day) >= 1) return day;
   }
-  return addDays(from, MAX_ITERATIONS);
+  /* c8 ignore next -- inatteignable : au-delà de la limite, usedOn vaut 0. */
+  return addDays(from, limit);
+}
+
+/** Dernier jour de présence imputable au quota, ou `null`. */
+function lastCountedDay(stays: Stay[]): IsoDate | null {
+  let last: IsoDate | null = null;
+  for (const s of stays) {
+    if (s.exempt || s.planned || !isIsoDate(s.entry)) continue;
+    const exit = s.exit;
+    if (exit === null || !isIsoDate(exit) || isBefore(exit, s.entry)) continue;
+    const counted = countedDays([s], s.entry, exit);
+    for (const day of counted) last = last === null ? day : maxDate(last, day);
+  }
+  return last;
+}
+
+/** Nombre de jours à explorer au plus pour que la fenêtre soit vide. */
+function searchLimit(stays: Stay[], from: IsoDate): number {
+  const last = lastCountedDay(stays);
+  if (last === null) return 0;
+  return Math.max(0, diffDays(from, last) + WINDOW);
 }
 
 /**
@@ -227,11 +396,15 @@ export function earliestReentry(stays: Stay[], from: IsoDate): IsoDate {
  * consommé.
  */
 export function fullResetDate(stays: Stay[], from: IsoDate): IsoDate {
-  for (let i = 0; i < MAX_ITERATIONS; i++) {
-    const day = addDays(from, i);
-    if (usedOn(stays, day) === 0) return day;
-  }
-  return addDays(from, MAX_ITERATIONS);
+  // Même raison : « quand retrouve-t-on les 90 jours » suppose qu'on est
+  // sorti. Un séjour ouvert non fermé ici renvoyait la borne de sécurité
+  // (from + 400) comme si c'était une vraie date — soit des mois d'écart.
+  const closed = closeOpenStays(stays, from);
+  const last = lastCountedDay(closed);
+  // Résultat EXACT, sans boucle : la fenêtre [D − 179 ; D] ne contient plus
+  // aucun jour consommé dès que D − 179 dépasse le dernier jour compté.
+  if (last === null) return from;
+  return maxDate(from, addDays(last, WINDOW));
 }
 
 // ──────────────────────────────────────────────────────────────────────

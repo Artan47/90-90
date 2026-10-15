@@ -5,7 +5,6 @@ import { useStore } from "@/components/Store";
 import { Card, PageTitle } from "@/components/ui";
 import { timeline, MAX_DAYS, materializePlanned, countedDays } from "@/lib/schengen";
 import { addDays, diffDays, formatDate, formatMonthYear, startOfMonth } from "@/lib/date";
-import { fill } from "@/lib/i18n";
 
 /**
  * Graphique sur 12 mois : 6 mois de passé, 6 mois de projection.
@@ -16,7 +15,7 @@ const MONTHS_BACK = 6;
 const MONTHS_FORWARD = 6;
 
 export default function TimelinePage() {
-  const { stays, today, ready, t } = useStore();
+  const { stays, today, ready, t, fmt } = useStore();
 
   const view = useMemo(() => {
     const from = startOfMonth(addDays(today, -MONTHS_BACK * 30));
@@ -148,7 +147,7 @@ export default function TimelinePage() {
 
           <Card>
             <p className="tnum text-sm font-medium">
-              {fill(t.timeline.peak, { n: peak })}
+              {fmt(t.timeline.peak, { n: peak })}
             </p>
             <p className="mt-1 text-xs muted">{t.plan.whyMore}</p>
           </Card>
