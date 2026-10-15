@@ -11,6 +11,25 @@ const fr: Messages = {
   appName: "Combien de jours",
   appTagline: "Le calculateur 90/180 pour Schengen",
 
+  people: {
+    defaultName: "Moi",
+    title: "Personnes",
+    switch: "Changer de personne",
+    add: "Ajouter une personne",
+    addFirst: "Ajouter la première personne",
+    name: "Nom",
+    namePlaceholder: "p.ex. Leugzim",
+    rename: "Renommer",
+    remove: "Supprimer la personne",
+    removeTitle: "Supprimer {name} ?",
+    removeBody: "Tous les séjours de {name} seront perdus. Cette action est irréversible.",
+    added: "{name} a été ajouté.",
+    empty: "Aucune personne pour l'instant. Ajoutes-en une pour commencer.",
+    staysCount: "{n} {n#séjour#séjours}",
+    remainingShort: "{n} {n#jour restant#jours restants}",
+    separateQuota: "Chaque personne a son propre quota 90/180. Les données ne se mélangent jamais.",
+  },
+
   nav: {
     home: "Accueil",
     stays: "Séjours",

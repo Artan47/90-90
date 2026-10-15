@@ -10,8 +10,8 @@
 import {
   createContext, useCallback, useContext, useEffect, useMemo, useState,
 } from "react";
-import type { AppData, Profile, Stay } from "@/lib/types";
-import { emptyData } from "@/lib/types";
+import type { AppData, Person, Profile, Stay } from "@/lib/types";
+import { emptyData, activePerson, makePerson } from "@/lib/types";
 import { loadData, saveData, newId, isStorageAvailable } from "@/lib/storage";
 import { todayIso, type IsoDate } from "@/lib/date";
 import {
@@ -22,6 +22,16 @@ import {
 interface StoreValue {
   data: AppData;
   today: IsoDate;
+  /** Toutes les personnes suivies. */
+  people: Person[];
+  /** Personne affichée. `null` tant qu'aucune n'existe. */
+  person: Person | null;
+  /** Passeport de la personne affichée. */
+  profile: Profile;
+  selectPerson: (id: string) => void;
+  addPerson: (name: string) => Person;
+  renamePerson: (id: string, name: string) => void;
+  removePerson: (id: string) => void;
   /** Langue effective : celle choisie, sinon celle du navigateur. */
   locale: Locale;
   setLocale: (locale: Locale) => void;
@@ -54,7 +64,21 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // Chargement au montage seulement : localStorage n'existe pas au rendu
   // serveur, et l'hydratation doit partir du même état vide.
   useEffect(() => {
-    setData(loadData());
+    const detectedLocale = detectLocale();
+    const defaultName = getMessages(detectedLocale).people.defaultName;
+    let loaded = loadData(defaultName);
+    // Premier lancement : on crée d'emblée une personne, pour que l'app
+    // soit utilisable sans configuration. Le multi-personnes reste donc
+    // une possibilité, pas une étape obligatoire.
+    if (loaded.people.length === 0) {
+      const me = makePerson(newId(), defaultName);
+      loaded = { ...loaded, people: [me], activeId: me.id };
+    }
+    setData(loaded);
+    // Normalise le stockage : une sauvegarde de la version 1 est réécrite
+    // au format courant dès l'ouverture, plutôt que d'être re-migrée à
+    // chaque lecture. L'opération est idempotente.
+    saveData(loaded);
     setStorageOk(isStorageAvailable());
     setToday(todayIso());
     setDetected(detectLocale());
@@ -80,7 +104,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     saveData(next);
   }, []);
 
-  const locale: Locale = data.profile.locale ?? detected;
+  const locale: Locale = data.locale ?? detected;
   const messages = getMessages(locale);
 
   // `lang` doit refléter la langue affichée : lecteurs d'écran, correction
@@ -89,38 +113,76 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.lang = locale;
   }, [locale]);
 
+  const person = activePerson(data);
+
   const value = useMemo<StoreValue>(() => {
+    /** Applique une transformation à la personne affichée. */
+    const patchPerson = (fn: (p: Person) => Person) => {
+      if (!person) return;
+      persist({
+        ...data,
+        people: data.people.map((p) => (p.id === person.id ? fn(p) : p)),
+      });
+    };
+
     const addStay = (stay: Omit<Stay, "id">): Stay => {
       const created: Stay = { ...stay, id: newId() };
-      persist({ ...data, stays: [...data.stays, created] });
+      patchPerson((p) => ({ ...p, stays: [...p.stays, created] }));
       return created;
+    };
+
+    const addPerson = (name: string): Person => {
+      const created = makePerson(newId(), name.trim().slice(0, 40) || messages.people.defaultName);
+      persist({ ...data, people: [...data.people, created], activeId: created.id });
+      return created;
+    };
+
+    const removePerson = (id: string) => {
+      const people = data.people.filter((p) => p.id !== id);
+      persist({
+        ...data,
+        people,
+        activeId: data.activeId === id ? (people[0]?.id ?? null) : data.activeId,
+      });
     };
 
     return {
       data,
       today,
+      people: data.people,
+      person,
+      profile: person?.profile ?? {},
+      selectPerson: (id) => persist({ ...data, activeId: id }),
+      addPerson,
+      renamePerson: (id, name) =>
+        persist({
+          ...data,
+          people: data.people.map((p) =>
+            p.id === id ? { ...p, name: name.trim().slice(0, 40) || p.name } : p,
+          ),
+        }),
+      removePerson,
       locale,
-      setLocale: (next: Locale) =>
-        persist({ ...data, profile: { ...data.profile, locale: next } }),
+      setLocale: (next: Locale) => persist({ ...data, locale: next }),
       t: messages,
       fmt: (template, values) => fill(template, values, locale),
       ready,
       storageOk,
-      stays: data.stays,
+      stays: person?.stays ?? [],
       addStay,
       updateStay: (id, patch) =>
-        persist({
-          ...data,
-          stays: data.stays.map((s) => (s.id === id ? { ...s, ...patch } : s)),
-        }),
+        patchPerson((p) => ({
+          ...p,
+          stays: p.stays.map((s) => (s.id === id ? { ...s, ...patch } : s)),
+        })),
       removeStay: (id) =>
-        persist({ ...data, stays: data.stays.filter((s) => s.id !== id) }),
+        patchPerson((p) => ({ ...p, stays: p.stays.filter((s) => s.id !== id) })),
       setProfile: (patch) =>
-        persist({ ...data, profile: { ...data.profile, ...patch } }),
+        patchPerson((p) => ({ ...p, profile: { ...p.profile, ...patch } })),
       replaceAll: (next) => persist(next),
       clearAll: () => persist(emptyData()),
     };
-  }, [data, today, locale, messages, ready, storageOk, persist]);
+  }, [data, person, today, locale, messages, ready, storageOk, persist]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }

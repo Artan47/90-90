@@ -60,10 +60,25 @@ await context.route("**/*", (route) => {
 });
 
 const page = await context.newPage();
+
+/** Écrit un jeu de données au format v2 (multi-personnes) pour la personne active. */
+async function setStays(stays, locale = "sq", profile = {}) {
+  await page.evaluate(({ stays, locale, profile }) => {
+    localStorage.setItem("sa-dite:v1", JSON.stringify({
+      version: 2,
+      locale,
+      activeId: "p1",
+      people: [{ id: "p1", name: "Test", stays, profile }],
+    }));
+  }, { stays, locale, profile });
+}
+
 page.on("pageerror", (e) => check("aucune erreur JS", false, e.message));
 
 // ── TEST B saisi dans l'interface (critère 4) ─────────────────────────
 await page.goto(BASE, { waitUntil: "networkidle" });
+// On écrit délibérément une sauvegarde au FORMAT V1 : la migration vers
+// le multi-personnes doit la reprendre sans rien perdre.
 await page.evaluate(() => {
   const stays = [
     ["2026-01-05", "2026-01-19"], ["2026-02-10", "2026-02-24"],
@@ -197,14 +212,10 @@ check("pays d'origine limités au Kosovo, Macédoine, Albanie",
 check("les 29 États Schengen sont toujours là", options.length === 34, `${options.length} entrées`);
 
 // ── Planification consolidée et résumé sur l'accueil ──────────────────
-await page.evaluate(() => {
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.stays = [
+await setStays([
     { id: "r1", entry: "2026-06-01", exit: "2026-08-24", country: "DE" },       // 85 j
     { id: "p1", entry: "2026-09-01", exit: "2026-09-10", country: "FR", planned: true },
-  ];
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+  ], "sq");
 await page.goto(BASE, { waitUntil: "networkidle" });
 await page.waitForTimeout(700);
 const home = await page.locator("body").innerText();
@@ -216,14 +227,10 @@ check("accueil : dépassement détecté au bon jour",
   /06\.09\.2026/.test(home) && /5 ditë tepër/.test(home));
 
 // un voyage planifié qui tient
-await page.evaluate(() => {
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.stays = [
+await setStays([
     { id: "r1", entry: "2026-06-01", exit: "2026-06-10", country: "DE" },
     { id: "p1", entry: "2026-09-01", exit: "2026-09-10", country: "FR", planned: true },
-  ];
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+  ], "sq");
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(700);
 const home2 = await page.locator("body").innerText();
@@ -231,12 +238,7 @@ check("accueil : voyage planifié accepté", /brenda kufirit/.test(home2));
 check("accueil : solde après les voyages planifiés", /10\.09\.2026.*70 ditë|70 ditë.*10\.09\.2026/s.test(home2));
 
 // ── Accords grammaticaux ──────────────────────────────────────────────
-await page.evaluate(() => {
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.profile.locale = "fr";
-  d.stays = [{ id: "a", entry: "2026-08-27", exit: "2026-08-27", country: "DE" }];
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+await setStays([{ id: "a", entry: "2026-08-27", exit: "2026-08-27", country: "DE" }], "fr");
 await page.goto(BASE, { waitUntil: "networkidle" });
 await page.waitForTimeout(700);
 const one = await page.locator("body").innerText();
@@ -246,11 +248,7 @@ check("accord : « 1 jour »", /· 1 jour\b/.test(one) && !/· 1 jours/.test(one
 const ringPlural = await page.locator("main section").first().locator("span").nth(1).innerText();
 check("accord : « jours restants » au pluriel pour 89", ringPlural.trim() === "jours restants", ringPlural.trim());
 
-await page.evaluate(() => {
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.stays = [{ id: "a", entry: "2026-05-31", exit: "2026-08-27", country: "DE" }]; // 89 j
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+await setStays([{ id: "a", entry: "2026-05-31", exit: "2026-08-27", country: "DE" }], "fr");
 await page.reload({ waitUntil: "networkidle" });
 await page.waitForTimeout(700);
 const ringOne = await page.locator("main section").first().locator("span").nth(1).innerText();
@@ -259,11 +257,7 @@ check("accord : « jour restant » au singulier pour 1",
   ringOneN.trim() === "1" && ringOne.trim() === "jour restant", `${ringOneN.trim()} ${ringOne.trim()}`);
 
 // ── Planificateur : « je veux rester N jours » ────────────────────────
-await page.evaluate(() => {
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.stays = [{ id: "h", entry: "2026-06-01", exit: "2026-08-19", country: "DE" }]; // 80 j
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+await setStays([{ id: "h", entry: "2026-06-01", exit: "2026-08-19", country: "DE" }], "fr");
 await page.goto(`${BASE}/plan/`, { waitUntil: "networkidle" });
 await page.waitForTimeout(600);
 await page.getByRole("button", { name: /Je veux rester X jours/ }).click();
@@ -284,18 +278,100 @@ const verdict = await page.locator("body").innerText();
 check(`planificateur : la date proposée (${proposed}) est validée`,
   /Ce voyage est autorisé/.test(verdict) && /55 jours/.test(verdict));
 
-// ── Paliers : « attendre quelques jours ne change rien… puis tout » ───
+// ── Migration v1 → multi-personnes ───────────────────────────────────
+// On repose délibérément une sauvegarde AU FORMAT V1, puis on recharge :
+// l'application doit la reprendre sans rien perdre.
 await page.evaluate(() => {
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.profile.locale = "fr";
-  d.stays = [
+  const stays = [
+    ["2026-01-05", "2026-01-19"], ["2026-02-10", "2026-02-24"],
+    ["2026-04-01", "2026-04-30"], ["2026-06-01", "2026-06-20"],
+  ].map(([entry, exit], i) => ({ id: `t${i}`, entry, exit, country: "DE" }));
+  localStorage.setItem("sa-dite:v1", JSON.stringify({
+    version: 1, stays, profile: { locale: "sq", passportExpiry: "2029-01-01" },
+  }));
+});
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForTimeout(800);
+const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem("sa-dite:v1")));
+check("migration : la sauvegarde est passée en v2", migrated.version === 2);
+check("migration : une personne a été créée", migrated.people?.length === 1);
+check("migration : les 4 séjours sont intacts", migrated.people?.[0]?.stays?.length === 4);
+check("migration : la langue est remontée au niveau de l'app", migrated.locale === "sq");
+check("migration : le passeport est conservé",
+  migrated.people?.[0]?.profile?.passportExpiry === "2029-01-01");
+
+// ── Deux personnes : les compteurs ne doivent JAMAIS se mélanger ──────
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+const firstName = await page.locator("button[aria-haspopup='dialog']").innerText();
+check("barre de personne affichée", /Unë|Moi/.test(firstName), firstName.split("\n")[0]);
+
+const before = (await page.locator("main span").first().innerText()).trim();
+check("personne 1 : 40 jours restants", before === "40", before);
+
+// ajouter une deuxième personne
+await page.locator("button[aria-haspopup='dialog']").click();
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: /Shto person/ }).click();
+await page.waitForTimeout(300);
+await page.locator('input[type="text"]').last().fill("Arta");
+await page.getByRole("button", { name: /^Ruaj$/ }).click();
+await page.waitForTimeout(700);
+
+const arta = (await page.locator("main span").first().innerText()).trim();
+check("personne 2 : repart de 90 jours, pas de mélange", arta === "90", arta);
+check("personne 2 : son nom est affiché",
+  /Arta/.test(await page.locator("button[aria-haspopup='dialog']").innerText()));
+
+// lui ajouter un séjour, puis vérifier que la personne 1 n'a pas bougé
+await page.goto(`${BASE}/stays/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+check("personne 2 : aucun séjour hérité", (await page.locator("main li").count()) === 0);
+await page.getByText("Shto qëndrim").click();
+await page.waitForTimeout(300);
+await page.locator("#entry").fill("2026-08-01");
+await page.locator("#exit").fill("2026-08-10");
+await page.getByRole("button", { name: /^Ruaj$/ }).click();
+await page.waitForTimeout(600);
+check("personne 2 : son séjour est enregistré", (await page.locator("main li").count()) === 1);
+
+// revenir à la personne 1
+await page.locator("button[aria-haspopup='dialog']").click();
+await page.waitForTimeout(400);
+await page.getByText(/Unë|Moi/).first().click();
+await page.waitForTimeout(700);
+check("personne 1 : retrouve ses 4 séjours", (await page.locator("main li").count()) === 4);
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+const back = (await page.locator("main span").first().innerText()).trim();
+check("personne 1 : son compteur est INCHANGÉ", back === "40", back);
+
+// le passeport est bien par personne
+await page.goto(`${BASE}/settings/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+await page.locator("#expiry").fill("2029-05-05");
+await page.getByRole("button", { name: /Ruaj në profil/ }).click();
+await page.waitForTimeout(600);
+await page.locator("button[aria-haspopup='dialog']").click();
+await page.waitForTimeout(400);
+await page.getByText("Arta").first().click();
+await page.waitForTimeout(700);
+const artaPassport = await page.locator("#expiry").inputValue();
+check("passeport : propre à chaque personne", artaPassport === "", `Arta a « ${artaPassport} »`);
+await page.locator("button[aria-haspopup='dialog']").click();
+await page.waitForTimeout(400);
+await page.getByText(/Unë|Moi/).first().click();
+await page.waitForTimeout(700);
+check("passeport : celui de la personne 1 est conservé",
+  (await page.locator("#expiry").inputValue()) === "2029-05-05");
+
+// ── Paliers : « attendre quelques jours ne change rien… puis tout » ───
+await setStays([
     { id: "1", entry: "2026-05-10", exit: "2026-06-08", country: "DE" },
     { id: "2", entry: "2026-06-20", exit: "2026-07-09", country: "DE" },
     { id: "3", entry: "2026-08-01", exit: "2026-08-15", country: "DE" },
     { id: "4", entry: "2026-09-20", exit: "2026-10-01", country: "DE" },
-  ];
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+  ], "fr");
 await page.goto(`${BASE}/plan/`, { waitUntil: "networkidle" });
 await page.waitForTimeout(500);
 await page.locator("#p-entry").fill("2026-10-22");
@@ -312,11 +388,7 @@ check("paliers : la première ligne n'est pas étiquetée « aujourd'hui »",
   /la date choisie/.test(mst) && !/13 jours \(jusqu'au 03\.11\.2026\) — aujourd'hui/.test(mst));
 
 // ── Dépassement : le chiffre ne doit PAS saturer à 90 ─────────────────
-await page.evaluate(() => {
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.profile.locale = "fr"; d.stays = [];
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+await setStays([], "fr");
 for (const [entry, exitDate, expectShorten] of [
   ["2026-09-01", "2026-12-05", 6],     // 96 j → retrancher 6
   ["2026-09-01", "2027-01-31", 63],    // 153 j → retrancher 63
@@ -381,15 +453,12 @@ check("passeport : au-delà de 6 mois, état valide sans alerte",
 // ── Changement de langue ──────────────────────────────────────────────
 // On remet les 4 séjours du TEST B : la section ci-dessus les avait
 // remplacés, et on veut revérifier les mêmes chiffres dans l'autre langue.
-await page.evaluate(() => {
-  const stays = [
-    ["2026-01-05", "2026-01-19"], ["2026-02-10", "2026-02-24"],
-    ["2026-04-01", "2026-04-30"], ["2026-06-01", "2026-06-20"],
-  ].map(([entry, exit], i) => ({ id: `t${i}`, entry, exit, country: "DE" }));
-  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
-  d.stays = stays;
-  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
-});
+await setStays([
+  { id: "t0", entry: "2026-01-05", exit: "2026-01-19", country: "DE" },
+  { id: "t1", entry: "2026-02-10", exit: "2026-02-24", country: "DE" },
+  { id: "t2", entry: "2026-04-01", exit: "2026-04-30", country: "DE" },
+  { id: "t3", entry: "2026-06-01", exit: "2026-06-20", country: "DE" },
+], "sq");
 await page.goto(`${BASE}/settings/`, { waitUntil: "networkidle" });
 await page.waitForTimeout(500);
 check("réglages : sélecteur de langue présent",
@@ -431,16 +500,21 @@ const frCtx = await browser.newContext({ locale: "fr-CH", viewport: { width: 390
 const frPage = await frCtx.newPage();
 await frPage.goto(BASE, { waitUntil: "networkidle" });
 await frPage.waitForTimeout(700);
+const frText2 = await frPage.locator("body").innerText();
 check("navigateur francophone → français automatiquement",
-  (await frPage.locator("body").innerText()).includes("Combien de jours me reste-t-il ?"));
+  frText2.includes("Combien de jours me reste-t-il ?"));
+check("premier lancement : une personne « Moi » est créée d'office",
+  frText2.includes("Moi"));
 await frCtx.close();
 
 const sqCtx = await browser.newContext({ locale: "de-DE", viewport: { width: 390, height: 844 } });
 const sqPage = await sqCtx.newPage();
 await sqPage.goto(BASE, { waitUntil: "networkidle" });
 await sqPage.waitForTimeout(700);
-check("autre langue → albanais par défaut",
-  (await sqPage.locator("body").innerText()).includes("Sa ditë më kanë mbetur?"));
+const sqText2 = await sqPage.locator("body").innerText();
+check("autre langue → albanais par défaut", sqText2.includes("Sa ditë më kanë mbetur?"));
+check("premier lancement albanais : personne « Unë » créée d'office",
+  sqText2.includes("Unë"));
 await sqCtx.close();
 
 // ── Critère 5 ─────────────────────────────────────────────────────────

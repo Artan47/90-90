@@ -16,6 +16,7 @@ import { usePathname } from "next/navigation";
 import { StoreProvider } from "@/components/Store";
 import { Nav } from "@/components/Nav";
 import { Disclaimer } from "@/components/Disclaimer";
+import { PersonBar } from "@/components/PersonBar";
 
 import HomePage from "@/app/page";
 import StaysPage from "@/app/stays/page";
@@ -40,7 +41,8 @@ function App() {
   return (
     <StoreProvider>
       <div className="mx-auto flex min-h-dvh w-full max-w-lg flex-col">
-        <main className="flex-1 px-4 pb-40 pt-5">
+        <PersonBar />
+        <main className="flex-1 px-4 pb-40 pt-4">
           <Screen />
         </main>
         <Disclaimer />

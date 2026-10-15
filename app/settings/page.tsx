@@ -19,7 +19,7 @@ import { LOCALE_LABELS, LOCALE_ORDER } from "@/lib/i18n";
 export default function SettingsPage() {
   const {
     data, stays, today, ready, storageOk, setProfile, replaceAll, clearAll,
-    t, fmt, locale, setLocale,
+    person, profile, t, fmt, locale, setLocale,
   } = useStore();
   const [toast, setToast] = useState<string | null>(null);
   const [notif, setNotif] = useState<NotificationSupport>("default");
@@ -35,9 +35,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!ready) return;
-    setIssuedDraft(data.profile.passportIssued ?? "");
-    setExpiryDraft(data.profile.passportExpiry ?? "");
-  }, [ready, data.profile.passportIssued, data.profile.passportExpiry]);
+    setIssuedDraft(profile.passportIssued ?? "");
+    setExpiryDraft(profile.passportExpiry ?? "");
+  }, [ready, profile.passportIssued, profile.passportExpiry]);
 
   const status = useMemo(() => statusOn(stays, today), [stays, today]);
 
@@ -53,10 +53,10 @@ export default function SettingsPage() {
       ? status.maxStay.lastPossibleExit
       : null;
 
-  const passport = passportStatus(data.profile, today, plannedExit);
+  const passport = passportStatus(profile, today, plannedExit);
   const dirty =
-    issuedDraft !== (data.profile.passportIssued ?? "") ||
-    expiryDraft !== (data.profile.passportExpiry ?? "");
+    issuedDraft !== (profile.passportIssued ?? "") ||
+    expiryDraft !== (profile.passportExpiry ?? "");
 
   function savePassport() {
     setProfile({
@@ -74,7 +74,7 @@ export default function SettingsPage() {
         today,
         remaining: status.remaining,
         mustLeaveBy: status.mustLeaveBy,
-        profile: data.profile,
+        profile,
         locale,
       });
     }
@@ -134,7 +134,10 @@ export default function SettingsPage() {
       </Card>
 
       <Card className="space-y-3">
-        <h2 className="font-bold">{t.settings.passport}</h2>
+        <h2 className="font-bold">
+          {t.settings.passport}
+          {person ? <span className="muted"> — {person.name}</span> : null}
+        </h2>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t.settings.passportIssued} htmlFor="issued">
             <DateInput id="issued" value={issuedDraft} onChange={setIssuedDraft} />
@@ -159,14 +162,14 @@ export default function SettingsPage() {
         ) : passport.expiringSoon ? (
           <p className="tnum rounded-xl bg-[var(--color-warn-soft)] px-3 py-2 text-sm font-medium text-[#7c2d12]">
             ⚠️ {fmt(t.settings.passportExpiringMonths, {
-              date: formatDate(data.profile.passportExpiry ?? ""),
+              date: formatDate(profile.passportExpiry ?? ""),
               n: passport.daysUntilExpiry ?? 0,
             })}
           </p>
         ) : (
           <p className="tnum text-sm text-[var(--color-ok)]">
             ✓ {fmt(t.settings.passportValidUntil, {
-              date: formatDate(data.profile.passportExpiry ?? ""),
+              date: formatDate(profile.passportExpiry ?? ""),
               n: passport.daysUntilExpiry ?? 0,
             })}
           </p>
@@ -263,7 +266,9 @@ export default function SettingsPage() {
           danger={false}
           onConfirm={() => {
             replaceAll(pendingImport);
-            flash(fmt(t.settings.imported, { n: pendingImport.stays.length }));
+            flash(fmt(t.settings.imported, {
+            n: pendingImport.people.reduce((n, p) => n + p.stays.length, 0),
+          }));
             setPendingImport(null);
           }}
           onCancel={() => setPendingImport(null)}

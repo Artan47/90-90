@@ -16,6 +16,25 @@ const sq = {
   appName: "Sa ditë",
   appTagline: "Llogaritësi 90/180 për Schengenin",
 
+  people: {
+    defaultName: "Unë",
+    title: "Personat",
+    switch: "Ndërro personin",
+    add: "Shto person",
+    addFirst: "Shto personin e parë",
+    name: "Emri",
+    namePlaceholder: "p.sh. Leugzim",
+    rename: "Ndrysho emrin",
+    remove: "Fshij personin",
+    removeTitle: "Ta fshij {name}?",
+    removeBody: "Të gjitha qëndrimet e {name} do të humbasin. Ky veprim s'kthehet.",
+    added: "{name} u shtua.",
+    empty: "Ende s'ke asnjë person. Shto një që të fillosh.",
+    staysCount: "{n} {n#qëndrim#qëndrime}",
+    remainingShort: "{n} ditë të mbetura",
+    separateQuota: "Secili person ka kuotën e vet 90/180. Të dhënat nuk përzihen kurrë.",
+  },
+
   nav: {
     home: "Ballina",
     stays: "Qëndrimet",

@@ -4,6 +4,8 @@ Application web installable (PWA) qui calcule les jours restants dans l'espace
 Schengen selon la règle **90 jours sur toute période de 180 jours**, pour des
 ressortissants du Kosovo qui font des allers-retours fréquents.
 
+**Plusieurs personnes** peuvent être suivies sur le même appareil, chacune avec
+son historique, son passeport et son compteur — le quota 90/180 est individuel.
 Interface en **albanais (shqip)** et en **français**, changeable à tout moment
 dans les réglages. Aucun compte, aucun serveur, **aucune donnée ne quitte
 l'appareil**.
@@ -137,7 +139,7 @@ lib/
   storage.ts               localStorage tolérant aux pannes + export/import JSON
   notifications.ts         Rappels locaux (aucun serveur, aucun push distant)
   passport.ts              Validité du passeport (10 ans, 6 mois, 3 mois après sortie)
-  types.ts                 Stay, Profile, AppData
+  types.ts                 Stay, Person, Profile, AppData
   i18n/sq.ts               Toutes les chaînes, en albanais (langue de référence)
   i18n/fr.ts               Traduction française
   i18n/index.ts            Registre des langues, détection, jetons {x}
@@ -155,6 +157,24 @@ scripts/
   build-sw.mjs             Remplit le précache du service worker après le build
   e2e-check.mjs            Vérifie les critères d'acceptation dans un vrai Chromium
 ```
+
+### Plusieurs personnes
+
+Chaque personne a son `id`, son nom, ses séjours et son passeport. Le
+sélecteur en haut de l'écran est visible en permanence : c'est le garde-fou
+contre l'erreur la plus coûteuse de l'application — saisir les séjours d'une
+personne dans le compteur d'une autre, ce qui donnerait un résultat faux sans
+le moindre avertissement.
+
+Au premier lancement, une personne est créée d'office (« Unë » / « Moi ») pour
+que l'application soit utilisable sans configuration.
+
+**Migration depuis la version 1.** Les sauvegardes mono-personne sont reprises
+telles quelles : leurs séjours deviennent la première personne, le passeport
+est conservé, et la langue — qui vivait dans le profil — remonte au niveau de
+l'application. La migration est idempotente et couverte par une dizaine de
+tests, dont un qui vérifie qu'**aucun séjour n'est perdu**. Le fichier est
+réécrit au format courant dès la première ouverture.
 
 ### Règle d'or sur les dates
 

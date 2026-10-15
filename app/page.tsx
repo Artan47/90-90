@@ -12,7 +12,7 @@ import { runReminders } from "@/lib/notifications";
 import { InstallPrompt } from "@/components/InstallPrompt";
 
 export default function HomePage() {
-  const { stays, today, ready, addStay, updateStay, data, t, fmt, locale } = useStore();
+  const { stays, today, ready, addStay, updateStay, person, profile, t, fmt, locale } = useStore();
   const [toast, setToast] = useState<string | null>(null);
 
   const status = useMemo(() => statusOn(stays, today), [stays, today]);
@@ -26,10 +26,10 @@ export default function HomePage() {
       today,
       remaining: status.remaining,
       mustLeaveBy: status.mustLeaveBy,
-      profile: data.profile,
+      profile,
       locale,
     });
-  }, [ready, today, status.remaining, status.mustLeaveBy, data.profile, locale]);
+  }, [ready, today, status.remaining, status.mustLeaveBy, profile, locale]);
 
   const overstay = status.issues.find((i) => i.code === "OVER_90");
   const tone = toneFor(status.remaining, status.compliant);
@@ -60,6 +60,19 @@ export default function HomePage() {
 
   if (!ready) {
     return <div className="h-64 animate-pulse rounded-2xl bg-[var(--surface)]" />;
+  }
+
+  // Aucune personne : on n'affiche SURTOUT pas « 90 jours restants », qui
+  // serait un chiffre inventé. On demande d'abord qui est concerné.
+  if (!person) {
+    return (
+      <Card className="text-center">
+        <p className="text-4xl" aria-hidden>👤</p>
+        <p className="mt-2 font-semibold">{t.people.empty}</p>
+        <p className="mt-1 text-sm muted">{t.people.separateQuota}</p>
+        <p className="mt-3 text-sm muted">↑ {t.people.addFirst}</p>
+      </Card>
+    );
   }
 
   const daysInsideLeft = status.mustLeaveBy ? diffDays(today, status.mustLeaveBy) : 0;

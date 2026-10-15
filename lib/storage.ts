@@ -10,7 +10,7 @@
  * pendant la session, et l'interface prévient que rien ne sera conservé.
  */
 
-import type { AppData, Stay } from "./types";
+import type { AppData, Person, Profile, Stay } from "./types";
 import { emptyData } from "./types";
 import { isIsoDate } from "./date";
 import { isLocale } from "./i18n";
@@ -55,27 +55,48 @@ function writeRaw(value: string): void {
 }
 
 /**
- * Valide une structure venue de localStorage ou d'un fichier importé.
+ * Valide une structure venue de localStorage ou d'un fichier importé, et
+ * MIGRE les sauvegardes de la version 1 (mono-personne).
+ *
  * Tout ce qui n'est pas reconnu est écarté plutôt que de faire planter
- * l'application au démarrage.
+ * l'application au démarrage. Une sauvegarde v1 ne doit JAMAIS être
+ * perdue : ses séjours et son passeport deviennent la première personne.
  */
-export function parseData(raw: unknown): AppData {
-  const base = emptyData();
-  if (typeof raw !== "object" || raw === null) return base;
+export function parseData(raw: unknown, defaultName = "Unë"): AppData {
+  if (typeof raw !== "object" || raw === null) return emptyData();
   const obj = raw as Record<string, unknown>;
 
-  const stays = Array.isArray(obj.stays) ? obj.stays.flatMap(sanitizeStay) : [];
-  const profileRaw =
-    typeof obj.profile === "object" && obj.profile !== null
-      ? (obj.profile as Record<string, unknown>)
-      : {};
+  const locale = isLocale(obj.locale) ? obj.locale : null;
 
-  const profile = { ...base.profile };
-  if (isIsoDate(profileRaw.passportExpiry)) profile.passportExpiry = profileRaw.passportExpiry;
-  if (isIsoDate(profileRaw.passportIssued)) profile.passportIssued = profileRaw.passportIssued;
-  if (isLocale(profileRaw.locale)) profile.locale = profileRaw.locale;
+  // ── Version 2 : plusieurs personnes ──────────────────────────────────
+  if (Array.isArray(obj.people)) {
+    const people = obj.people.flatMap((p) => sanitizePerson(p, defaultName));
+    const activeId =
+      typeof obj.activeId === "string" && people.some((p) => p.id === obj.activeId)
+        ? obj.activeId
+        : (people[0]?.id ?? null);
+    return { version: 2, people, activeId, locale };
+  }
 
-  return { version: 1, stays, profile };
+  // ── Version 1 : une seule personne, implicite ────────────────────────
+  if (Array.isArray(obj.stays) || typeof obj.profile === "object") {
+    const person = sanitizePerson(
+      { id: newId(), name: defaultName, stays: obj.stays, profile: obj.profile },
+      defaultName,
+    )[0];
+    if (!person) return { ...emptyData(), locale };
+    // En v1 la langue vivait dans le profil : on la remonte.
+    const legacy = person.profile.locale;
+    delete person.profile.locale;
+    return {
+      version: 2,
+      people: [person],
+      activeId: person.id,
+      locale: locale ?? (isLocale(legacy) ? legacy : null),
+    };
+  }
+
+  return { ...emptyData(), locale };
 }
 
 function sanitizeStay(raw: unknown): Stay[] {
@@ -88,7 +109,10 @@ function sanitizeStay(raw: unknown): Stay[] {
     id: typeof s.id === "string" && s.id.length > 0 ? s.id : newId(),
     entry: s.entry,
     exit,
-    country: typeof s.country === "string" && s.country.length > 0 ? s.country.toUpperCase() : "OTHER",
+    country:
+      typeof s.country === "string" && s.country.length > 0
+        ? s.country.toUpperCase()
+        : "OTHER",
   };
   if (typeof s.note === "string" && s.note.length > 0) stay.note = s.note;
   if (s.exempt === true) stay.exempt = true;
@@ -96,11 +120,41 @@ function sanitizeStay(raw: unknown): Stay[] {
   return [stay];
 }
 
-export function loadData(): AppData {
+function sanitizePerson(raw: unknown, defaultName: string): Person[] {
+  if (typeof raw !== "object" || raw === null) return [];
+  const p = raw as Record<string, unknown>;
+
+  const stays = Array.isArray(p.stays) ? p.stays.flatMap(sanitizeStay) : [];
+  const profileRaw =
+    typeof p.profile === "object" && p.profile !== null
+      ? (p.profile as Record<string, unknown>)
+      : {};
+
+  const profile: Profile = {};
+  if (isIsoDate(profileRaw.passportExpiry)) profile.passportExpiry = profileRaw.passportExpiry;
+  if (isIsoDate(profileRaw.passportIssued)) profile.passportIssued = profileRaw.passportIssued;
+  if (isLocale(profileRaw.locale)) profile.locale = profileRaw.locale;
+
+  const name =
+    typeof p.name === "string" && p.name.trim().length > 0
+      ? p.name.trim().slice(0, 40)
+      : defaultName;
+
+  return [
+    {
+      id: typeof p.id === "string" && p.id.length > 0 ? p.id : newId(),
+      name,
+      stays,
+      profile,
+    },
+  ];
+}
+
+export function loadData(defaultName = "Unë"): AppData {
   const raw = readRaw();
   if (!raw) return emptyData();
   try {
-    return parseData(JSON.parse(raw));
+    return parseData(JSON.parse(raw), defaultName);
   } catch {
     return emptyData();
   }
@@ -134,8 +188,8 @@ export function toExportString(data: AppData): string {
   );
 }
 
-export function fromImportString(text: string): AppData {
-  return parseData(JSON.parse(text));
+export function fromImportString(text: string, defaultName = "Unë"): AppData {
+  return parseData(JSON.parse(text), defaultName);
 }
 
 /** Déclenche le téléchargement du fichier de sauvegarde. */
