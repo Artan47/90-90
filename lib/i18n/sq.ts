@@ -51,7 +51,6 @@ const sq = {
     add: "Shto person",
     addFirst: "Shto personin e parë",
     name: "Emri",
-    namePlaceholder: "p.sh. Leugzim",
     rename: "Ndrysho emrin",
     remove: "Fshij personin",
     removeTitle: "Ta fshij {name}?",

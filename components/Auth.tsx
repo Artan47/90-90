@@ -63,12 +63,7 @@ export function Auth() {
 
         {mode === "register" ? (
           <Field label={t.auth.name} htmlFor="a-name">
-            <TextInput
-              id="a-name"
-              value={name}
-              onChange={setName}
-              placeholder={t.people.namePlaceholder}
-            />
+            <TextInput id="a-name" value={name} onChange={setName} />
           </Field>
         ) : null}
 

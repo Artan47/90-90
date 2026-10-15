@@ -46,7 +46,6 @@ const fr: Messages = {
     add: "Ajouter une personne",
     addFirst: "Ajouter la première personne",
     name: "Nom",
-    namePlaceholder: "p.ex. Leugzim",
     rename: "Renommer",
     remove: "Supprimer la personne",
     removeTitle: "Supprimer {name} ?",

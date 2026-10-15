@@ -32,7 +32,22 @@ out/
 
 ---
 
-## 2. Déposer les fichiers chez Infomaniak
+## 2a. La méthode rapide : le script fourni
+
+```bash
+export SADITE_FTP_USER=votre_utilisateur
+export SADITE_FTP_PASS=votre_mot_de_passe
+export SADITE_FTP_DIR=/web          # adaptez au dossier racine réel
+
+./scripts/deploy-infomaniak.sh
+```
+
+Le script construit le site puis l'envoie. Il n'écrit jamais vos
+identifiants dans le dépôt : ils sont lus depuis l'environnement, ou
+demandés à l'exécution. Il demande `lftp` (`brew install lftp` sur macOS,
+`sudo apt install lftp` sur Debian/Ubuntu).
+
+## 2b. Déposer les fichiers à la main
 
 Dans le **Manager Infomaniak** → *Hébergement Web* → votre site :
 
@@ -52,6 +67,10 @@ lftp -u VOTRE_UTILISATEUR ftp.infomaniak.com \
 
 > ⚠️ `--delete` supprime sur le serveur les fichiers absents de `out/`.
 > C'est voulu : les anciens bundles JavaScript doivent disparaître.
+> Excluez `.well-known/`, qui sert aux certificats.
+
+> ⚠️ Déposez le **contenu** de `out/`, pas le dossier `out` lui-même.
+> Si vous voyez `https://www.sadite.ch/out/`, c'est l'erreur à corriger.
 
 ---
 
@@ -78,6 +97,13 @@ C'est le piège le plus probable de cette mise en ligne.
 
 ---
 
+## 4b. Le chiffrement des comptes exige HTTPS
+
+Les comptes sont chiffrés via **WebCrypto**, que les navigateurs ne rendent
+disponible que dans un « contexte sécurisé ». En HTTP simple, la création de
+compte échouerait. C'est une raison de plus de ne pas remettre à plus tard le
+certificat de l'étape 3.
+
 ## 5. Vérifier après la mise en ligne
 
 1. Ouvrir `https://www.sadite.ch` sur un téléphone.
@@ -88,6 +114,9 @@ C'est le piège le plus probable de cette mise en ligne.
    iPhone/Safari : Partager → *Sur l'écran d'accueil*.
 5. Onglet **Réseau** des outils de développement : aucune requête vers un
    domaine autre que `sadite.ch`.
+6. Créer un compte avec un mot de passe, puis vérifier dans
+   *Application → Local Storage* que les séjours n'y apparaissent **pas en
+   clair** : vous devez voir un bloc `sealed` illisible.
 
 ---
 
