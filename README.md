@@ -135,6 +135,7 @@ lib/
   schengen.ts              MOTEUR 90/180 — fonctions pures, sans UI ni horloge
   storage.ts               localStorage tolérant aux pannes + export/import JSON
   notifications.ts         Rappels locaux (aucun serveur, aucun push distant)
+  passport.ts              Validité du passeport (10 ans, 6 mois, 3 mois après sortie)
   types.ts                 Stay, Profile, AppData
   i18n/sq.ts               Toutes les chaînes, en albanais (langue de référence)
   i18n/fr.ts               Traduction française
@@ -181,6 +182,8 @@ Toutes les fonctions de `lib/schengen.ts` sont pures :
 | `validate(stays, today?)` | `OVERLAP`, `EXIT_BEFORE_ENTRY`, `FUTURE_ENTRY_IN_HISTORY`, `OVER_90` |
 | `plannedOutlook(stays, today)` | Juge les voyages planifiés **en bloc**, pas un par un |
 | `summarize(stays, today)` | Nombre de séjours réels et total de jours |
+| `suggestEntryFor(stays, from, n)` | Première date d'entrée permettant `n` jours d'affilée |
+| `closeOpenStays(stays, day)` | Ferme les séjours ouverts : hypothèse explicite des projections |
 | `statusOn(stays, today)` | Vue d'ensemble de l'écran d'accueil |
 
 Un séjour en cours (`exit === null`) est traité comme se terminant le jour
@@ -231,7 +234,15 @@ Trois bugs réels ont été trouvés et corrigés par cette démarche :
    maintenant calculée **exactement** (`dernier jour compté + 180`), sans
    boucle ; `earliestReentry` borne sa recherche sur la donnée, plus sur une
    constante.
-3. **Accords grammaticaux.** 22 libellés affichaient « 1 jours »,
+3. **Dépassement saturé et conseil faux.** `simulate` renvoyait le PIC de
+   dépassement, qui plafonne mécaniquement à 90 : une fenêtre de 180 jours ne
+   peut pas contenir plus de 180 jours de présence. Un voyage d'un an
+   annonçait donc « 90 jours de trop » alors qu'il en comptait 275, et le
+   conseil « raccourcis de 90 jours » laissait un séjour encore illégal.
+   `daysOver` est désormais le nombre de jours à RETRANCHER
+   (`durée − durée légale maximale`), vérifié par un test qui raccourcit
+   réellement le voyage et revérifie sa légalité.
+4. **Accords grammaticaux.** 22 libellés affichaient « 1 jours »,
    « 1 séjours ». `fill()` accorde désormais via `Intl.PluralRules`, qui
    connaît les vraies règles : le français met « 0 jour » au singulier,
    l'albanais met « 0 ditë » au pluriel.

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  addDays, diffDays, inclusiveDays, toIso, fromIso, isIsoDate, eachDay,
+  addDays, addMonths, addYears, diffDays, inclusiveDays, toIso, fromIso, isIsoDate, eachDay,
   formatDate, formatMonthYear, minDate, maxDate, clampDate, startOfMonth,
   todayIso, compareDates, isBefore, isAfter, isSameOrBefore, isSameOrAfter,
 } from "./date";
@@ -19,6 +19,25 @@ describe("lib/date — arithmétique calendaire", () => {
     expect(addDays("2026-03-01", -1)).toBe("2026-02-28");
     expect(addDays("2026-04-09", -179)).toBe("2025-10-12");
     expect(addDays("2026-08-27", 0)).toBe("2026-08-27");
+  });
+
+  it("addMonths borne au dernier jour du mois d'arrivée", () => {
+    expect(addMonths("2026-01-31", 1)).toBe("2026-02-28");
+    expect(addMonths("2024-01-31", 1)).toBe("2024-02-29"); // bissextile
+    expect(addMonths("2026-01-15", 1)).toBe("2026-02-15");
+    expect(addMonths("2026-03-31", -1)).toBe("2026-02-28");
+    expect(addMonths("2026-12-15", 1)).toBe("2027-01-15");
+    expect(addMonths("2026-01-15", -1)).toBe("2025-12-15");
+    expect(addMonths("2026-06-15", 0)).toBe("2026-06-15");
+    expect(addMonths("2026-06-15", 12)).toBe("2027-06-15");
+    expect(addMonths("2026-06-15", -18)).toBe("2024-12-15");
+  });
+
+  it("addYears gère le 29 février", () => {
+    expect(addYears("2024-02-29", 1)).toBe("2025-02-28");
+    expect(addYears("2024-02-29", 4)).toBe("2028-02-29");
+    expect(addYears("2026-05-05", 10)).toBe("2036-05-05");
+    expect(addYears("2026-05-05", -10)).toBe("2016-05-05");
   });
 
   it("diffDays et inclusiveDays", () => {

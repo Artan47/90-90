@@ -11,7 +11,12 @@ export default defineConfig({
     include: ["lib/**/*.test.ts"],
     coverage: {
       provider: "v8",
-      include: ["lib/schengen.ts", "lib/date.ts", "lib/schengen-membership.ts"],
+      include: [
+        "lib/schengen.ts",
+        "lib/date.ts",
+        "lib/schengen-membership.ts",
+        "lib/passport.ts",
+      ],
       thresholds: { lines: 95, functions: 95, branches: 90, statements: 95 },
     },
   },

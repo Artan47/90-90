@@ -11,6 +11,8 @@
 
 import type { IsoDate } from "./date";
 import { diffDays, formatDate } from "./date";
+import { passportStatus } from "./passport";
+import type { Profile } from "./types";
 import { fill, getMessages, DEFAULT_LOCALE, type Locale, type Messages } from "./i18n";
 
 const SEEN_KEY = "sa-dite:notified:v1";
@@ -56,6 +58,8 @@ export interface ReminderInput {
   today: IsoDate;
   remaining: number;
   mustLeaveBy: IsoDate | null;
+  /** Profil, pour l'alerte d'expiration du passeport. */
+  profile?: Profile;
   /** Langue des rappels ; l'albanais par défaut. */
   locale?: Locale;
 }
@@ -75,13 +79,13 @@ export function dueReminders(
     out.push({
       key: `lt7:${today}`,
       title: t.appName,
-      body: fill(t.notifications.under7, { n: remaining }),
+      body: fill(t.notifications.under7, { n: remaining }, input.locale ?? DEFAULT_LOCALE),
     });
   } else if (remaining < 15) {
     out.push({
       key: `lt15:${today}`,
       title: t.appName,
-      body: fill(t.notifications.under15, { n: remaining }),
+      body: fill(t.notifications.under15, { n: remaining }, input.locale ?? DEFAULT_LOCALE),
     });
   }
 
@@ -91,7 +95,30 @@ export function dueReminders(
       out.push({
         key: `leave:${mustLeaveBy}:${today}`,
         title: t.appName,
-        body: fill(t.home.insideBanner, { date: formatDate(mustLeaveBy) }),
+        body: fill(t.home.insideBanner, { date: formatDate(mustLeaveBy) }, input.locale ?? DEFAULT_LOCALE),
+      });
+    }
+  }
+
+  // Passeport : alerte dès qu'il reste moins de 6 mois de validité, puis
+  // une fois expiré. La clé inclut la date d'expiration pour qu'un nouveau
+  // passeport réarme l'alerte.
+  if (input.profile) {
+    const passport = passportStatus(input.profile, today);
+    if (passport.expired) {
+      out.push({
+        key: `passport-expired:${input.profile.passportExpiry}:${today}`,
+        title: t.appName,
+        body: t.settings.passportExpired,
+      });
+    } else if (passport.expiringSoon && passport.daysUntilExpiry !== null) {
+      out.push({
+        key: `passport-6m:${input.profile.passportExpiry}:${today}`,
+        title: t.appName,
+        body: fill(t.notifications.passportSoon, {
+          date: formatDate(input.profile.passportExpiry as IsoDate),
+          n: passport.daysUntilExpiry,
+        }, input.locale ?? DEFAULT_LOCALE),
       });
     }
   }

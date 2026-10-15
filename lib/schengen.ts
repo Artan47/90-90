@@ -341,6 +341,9 @@ export function suggestEntryFor(
     }
   }
 
+  /* v8 ignore next 4 -- inatteignable : `wanted` est borné à 90, et la
+     fenêtre se vide toujours en moins de 180 jours, donc une date existe
+     toujours dans les 400 jours explorés. Un test de balayage le vérifie. */
   return {
     wanted, entry: null, exit: null, waitDays: 0,
     immediate: false, maxFromNow,
@@ -366,7 +369,7 @@ export function earliestReentry(stays: Stay[], from: IsoDate): IsoDate {
     const day = addDays(from, i);
     if (remainingOn(closed, day) >= 1) return day;
   }
-  /* c8 ignore next -- inatteignable : au-delà de la limite, usedOn vaut 0. */
+  /* v8 ignore next -- inatteignable : au-delà de la limite, usedOn vaut 0. */
   return addDays(from, limit);
 }
 
@@ -415,8 +418,21 @@ export interface SimulationResult {
   ok: boolean;
   /** Premier jour du voyage où le quota est dépassé. */
   firstOverflowDate?: IsoDate;
-  /** Nombre de jours à retrancher du voyage pour redevenir légal. */
+  /**
+   * Nombre de jours à RETRANCHER de la fin du voyage pour qu'il redevienne
+   * légal.
+   *
+   * Ce n'est volontairement PAS le pic de dépassement observé : celui-ci
+   * plafonne mécaniquement à 90 (une fenêtre de 180 jours ne peut pas
+   * contenir plus de 180 jours de présence), si bien qu'un voyage d'un an
+   * affichait « 90 jours de trop » alors qu'il en comptait 275 — et le
+   * conseil « raccourcis de 90 jours » laissait un séjour encore illégal.
+   */
   daysOver?: number;
+  /** Durée légale maximale en entrant à cette date (0 = aucune). */
+  maxLegalDays?: number;
+  /** Dernière sortie légale pour cette date d'entrée. */
+  maxLegalExit?: IsoDate;
 }
 
 /** Rend « réels » les séjours planifiés, pour les inclure dans une projection. */
@@ -444,18 +460,28 @@ export function simulate(
   ];
 
   let firstOverflowDate: IsoDate | undefined;
-  let daysOver = 0;
 
   for (const day of eachDay(trip.entry, trip.exit)) {
-    const excess = usedOn(withTrip, day) - MAX_DAYS;
-    if (excess > 0) {
-      if (!firstOverflowDate) firstOverflowDate = day;
-      daysOver = Math.max(daysOver, excess);
+    if (usedOn(withTrip, day) > MAX_DAYS) {
+      firstOverflowDate = day;
+      break;
     }
   }
 
   if (!firstOverflowDate) return { ok: true };
-  return { ok: false, firstOverflowDate, daysOver };
+
+  // De combien faut-il raccourcir ? La différence avec le séjour le plus
+  // long légalement possible à cette date d'entrée.
+  const max = maxStayFrom(real, trip.entry);
+  const length = inclusiveDays(trip.entry, trip.exit);
+
+  return {
+    ok: false,
+    firstOverflowDate,
+    daysOver: Math.max(1, length - max.days),
+    maxLegalDays: max.days,
+    maxLegalExit: max.days > 0 ? max.lastPossibleExit : undefined,
+  };
 }
 
 // ──────────────────────────────────────────────────────────────────────

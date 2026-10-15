@@ -12,7 +12,7 @@ import { runReminders } from "@/lib/notifications";
 import { InstallPrompt } from "@/components/InstallPrompt";
 
 export default function HomePage() {
-  const { stays, today, ready, addStay, updateStay, t, fmt, locale } = useStore();
+  const { stays, today, ready, addStay, updateStay, data, t, fmt, locale } = useStore();
   const [toast, setToast] = useState<string | null>(null);
 
   const status = useMemo(() => statusOn(stays, today), [stays, today]);
@@ -26,9 +26,10 @@ export default function HomePage() {
       today,
       remaining: status.remaining,
       mustLeaveBy: status.mustLeaveBy,
+      profile: data.profile,
       locale,
     });
-  }, [ready, today, status.remaining, status.mustLeaveBy, locale]);
+  }, [ready, today, status.remaining, status.mustLeaveBy, data.profile, locale]);
 
   const overstay = status.issues.find((i) => i.code === "OVER_90");
   const tone = toneFor(status.remaining, status.compliant);

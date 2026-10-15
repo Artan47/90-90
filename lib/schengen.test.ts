@@ -7,7 +7,7 @@ import {
   stayDays, currentStay, mustLeaveBy, statusOn, materializePlanned,
   MAX_ITERATIONS, plannedOutlook, summarize, suggestEntryFor, closeOpenStays,
 } from "./schengen";
-import { inclusiveDays, addDays } from "./date";
+import { inclusiveDays, addDays, isBefore, isSameOrAfter } from "./date";
 
 /** Fabrique un séjour ; l'id est dérivé des dates pour la lisibilité. */
 function stay(entry: string, exit: string | null, extra: Partial<Stay> = {}): Stay {
@@ -367,6 +367,62 @@ describe("simulate", () => {
     expect(r.ok).toBe(false);
     expect(r.firstOverflowDate).toBe("2026-05-01");
     expect(r.daysOver).toBeGreaterThan(0);
+  });
+
+  it("le nombre de jours à retrancher ne sature JAMAIS à 90", () => {
+    // Régression : le pic de dépassement plafonne mécaniquement à 90 (une
+    // fenêtre de 180 jours ne peut pas contenir plus de 180 jours), si bien
+    // qu'un voyage d'un an annonçait « 90 jours de trop » et conseillait de
+    // le raccourcir de 90 — ce qui en laissait 275, toujours illégaux.
+    const year = simulate([], { entry: "2026-09-01", exit: "2027-08-31" });
+    expect(year.ok).toBe(false);
+    expect(inclusiveDays("2026-09-01", "2027-08-31")).toBe(365);
+    expect(year.daysOver).toBe(275);
+    expect(year.maxLegalDays).toBe(90);
+
+    // Et le conseil est vérifiable : retrancher ce nombre rend le voyage légal.
+    const fixed = addDays("2027-08-31", -year.daysOver!);
+    expect(simulate([], { entry: "2026-09-01", exit: fixed }).ok).toBe(true);
+    expect(inclusiveDays("2026-09-01", fixed)).toBe(90);
+  });
+
+  it("le conseil « raccourcis de N » est toujours exact", () => {
+    const histories: Stay[][] = [
+      [],
+      [stay("2026-06-01", "2026-08-19")],
+      [stay("2026-01-10", "2026-04-09")],
+      [stay("2026-03-01", "2026-03-20"), stay("2026-05-01", "2026-06-15")],
+    ];
+    for (const history of histories) {
+      for (const [entry, exit] of [
+        ["2026-09-01", "2026-12-05"], ["2026-09-01", "2027-01-31"],
+        ["2026-09-01", "2027-08-31"], ["2026-10-15", "2026-11-20"],
+      ] as const) {
+        const r = simulate(history, { entry, exit });
+        if (r.ok) continue;
+        const shortened = addDays(exit, -r.daysOver!);
+        if (isBefore(shortened, entry)) {
+          // Aucun séjour légal à cette date : le moteur doit le dire.
+          expect(r.maxLegalDays).toBe(0);
+        } else {
+          expect(simulate(history, { entry, exit: shortened }).ok).toBe(true);
+        }
+      }
+    }
+  });
+
+  it("expose la sortie légale maximale", () => {
+    const r = simulate([], { entry: "2026-09-01", exit: "2026-12-05" });
+    expect(r.maxLegalDays).toBe(90);
+    expect(r.maxLegalExit).toBe("2026-11-29");
+    expect(inclusiveDays("2026-09-01", r.maxLegalExit!)).toBe(90);
+  });
+
+  it("quota épuisé : aucune sortie légale", () => {
+    const r = simulate([stay("2026-01-10", "2026-04-09")], { entry: "2026-04-10", exit: "2026-04-20" });
+    expect(r.ok).toBe(false);
+    expect(r.maxLegalDays).toBe(0);
+    expect(r.maxLegalExit).toBeUndefined();
   });
 
   it("refuse un voyage dont la sortie précède l'entrée", () => {
@@ -750,6 +806,30 @@ describe("suggestEntryFor — « je veux rester N jours, à partir de quand ? »
     const history = [stay("2026-06-01", "2026-08-19")];
     const r = suggestEntryFor(history, "2026-08-27", 55);
     expect(r.maxFromNow).toBe(maxStayFrom(history, "2026-08-27").days);
+  });
+
+  it("trouve TOUJOURS une date, quel que soit l'historique", () => {
+    // Prouve que le repli « aucune date » est du code mort : si ce test
+    // échoue un jour, c'est que le moteur peut rester sans réponse.
+    const histories: Stay[][] = [
+      [],
+      [stay("2026-01-10", "2026-04-09")],
+      [stay("2026-01-01", "2026-12-31")],        // dépassement massif
+      [stay("2026-06-01", null)],                 // séjour en cours
+      [stay("2020-01-01", null)],                 // séjour ouvert très ancien
+      [stay("2026-01-01", "2026-03-01"), stay("2026-03-05", "2026-06-30")],
+    ];
+    for (const history of histories) {
+      for (const from of ["2026-01-01", "2026-06-15", "2026-12-31", "2027-05-01"]) {
+        for (const want of [1, 30, 55, 89, 90]) {
+          const r = suggestEntryFor(history, from, want);
+          expect({ from, want, entry: r.entry === null ? "AUCUNE" : "ok" })
+            .toEqual({ from, want, entry: "ok" });
+          expect(inclusiveDays(r.entry!, r.exit!)).toBe(want);
+          expect(isSameOrAfter(r.entry!, from)).toBe(true);
+        }
+      }
+    }
   });
 
   it("ignore les voyages déjà planifiés", () => {

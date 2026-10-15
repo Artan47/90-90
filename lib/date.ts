@@ -79,6 +79,34 @@ export function addDays(date: IsoDate, days: number): IsoDate {
 }
 
 /**
+ * Décale une date d'un nombre de MOIS calendaires, en bornant au dernier
+ * jour du mois d'arrivée.
+ *
+ *   addMonths("2026-01-31", 1) === "2026-02-28"   (et non le 3 mars)
+ *   addMonths("2024-01-31", 1) === "2024-02-29"   (année bissextile)
+ *
+ * Indispensable pour les règles de validité du passeport, qui s'expriment
+ * en mois (« valable 3 mois après la sortie », « alerte à 6 mois »), et non
+ * en multiples de 30 jours.
+ */
+export function addMonths(date: IsoDate, months: number): IsoDate {
+  const t = fromIso(date);
+  const d = new Date(t);
+  const year = d.getUTCFullYear();
+  const month = d.getUTCMonth() + months;
+  const day = d.getUTCDate();
+  const targetYear = year + Math.floor(month / 12);
+  const targetMonth = ((month % 12) + 12) % 12;
+  const lastDay = new Date(utc(targetYear, targetMonth + 2, 0)).getUTCDate();
+  return toIso(utc(targetYear, targetMonth + 1, Math.min(day, lastDay)));
+}
+
+/** Décale une date d'un nombre d'années calendaires (29 février borné). */
+export function addYears(date: IsoDate, years: number): IsoDate {
+  return addMonths(date, years * 12);
+}
+
+/**
  * Nombre de jours de `from` à `to` (to − from).
  * diffDays("2026-03-10", "2026-03-11") === 1
  */

@@ -120,6 +120,10 @@ const sq = {
     suggestBody: "Në vend që të hysh më {wanted}, hyr më {date}: atëherë mund të rrish {n} ditë.",
     useSuggestion: "Përdore këtë datë",
     openStayNote: "Je ende brenda. Llogaritja supozon se del më {date}.",
+    shortenTo: "Shkurtoje: hyr më {entry} dhe dil më {exit} ({n} ditë).",
+    postponeTo: "Ose shtyje: hyr më {date} dhe rri {n} ditë.",
+    tooLongEver: "Asnjë qëndrim nuk mund të kalojë 90 ditë rresht.",
+    noLegalStay: "Me këtë datë nuk mund të hysh fare.",
   },
 
   timeline: {
@@ -165,6 +169,11 @@ const sq = {
     notificationsUnsupported: "Ky shfletues nuk i mbështet njoftimet.",
     storageWarning: "Ruajtja lokale nuk është e disponueshme (dritare private?). Të dhënat do të humbin kur ta mbyllësh faqen. Përdor eksportin.",
     about: "Rreth aplikacionit",
+    passportSave: "Ruaj në profil",
+    passportSaved: "Pasaporta u ruajt në profil.",
+    passportExpiringMonths: "Pasaportës i kanë mbetur më pak se 6 muaj: skadon më {date} (edhe {n} ditë).",
+    passportValidUntil: "E vlefshme deri më {date} — edhe {n} ditë.",
+    passportNoDates: "Shto datat e pasaportës për të marrë njoftim 6 muaj para skadimit.",
   },
 
   about: {
@@ -212,6 +221,7 @@ const sq = {
   notifications: {
     under7: "Të kanë mbetur vetëm {n} ditë nga 90.",
     under15: "Të kanë mbetur {n} ditë nga 90.",
+    passportSoon: "Pasaporta skadon më {date} — edhe {n} ditë.",
   },
 
   common: {

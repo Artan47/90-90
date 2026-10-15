@@ -284,6 +284,73 @@ const verdict = await page.locator("body").innerText();
 check(`planificateur : la date proposée (${proposed}) est validée`,
   /Ce voyage est autorisé/.test(verdict) && /55 jours/.test(verdict));
 
+// ── Dépassement : le chiffre ne doit PAS saturer à 90 ─────────────────
+await page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.profile.locale = "fr"; d.stays = [];
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
+for (const [entry, exitDate, expectShorten] of [
+  ["2026-09-01", "2026-12-05", 6],     // 96 j → retrancher 6
+  ["2026-09-01", "2027-01-31", 63],    // 153 j → retrancher 63
+  ["2026-09-01", "2027-08-31", 275],   // 365 j → retrancher 275, pas 90
+]) {
+  await page.goto(`${BASE}/plan/`, { waitUntil: "networkidle" });
+  await page.waitForTimeout(400);
+  await page.getByRole("button", { name: /Je veux rester du/ }).click();
+  await page.waitForTimeout(250);
+  await page.locator("#p-entry").fill(entry);
+  await page.locator("#p-exit").fill(exitDate);
+  await page.waitForTimeout(600);
+  const txt = await page.locator("main").innerText();
+  check(`dépassement ${entry}→${exitDate} : ${expectShorten} jours à retrancher`,
+    new RegExp(`Raccourcis le voyage de ${expectShorten} jours`).test(txt));
+  check(`remède ${entry}→${exitDate} : propose une sortie concrète`,
+    /Raccourcis : entre le .* et sors le /.test(txt));
+  check(`remède ${entry}→${exitDate} : plus de « entre le X … entre le X »`,
+    !new RegExp(`Plutôt que d'entrer le ${entry.split("-").reverse().join(".")}, entre le ${entry.split("-").reverse().join(".")}`).test(txt));
+}
+// un voyage de plus de 90 jours doit le dire explicitement
+const longTxt = await page.locator("main").innerText();
+check("voyage > 90 jours : dit qu'aucune date ne le permet",
+  /Aucun séjour ne peut dépasser 90 jours/.test(longTxt));
+
+// le remède « raccourcir » doit réellement rendre le voyage légal
+await page.getByRole("button", { name: /Utiliser cette date/ }).first().click();
+await page.waitForTimeout(700);
+check("le remède appliqué rend le voyage autorisé",
+  /Ce voyage est autorisé/.test(await page.locator("main").innerText()));
+
+// ── Passeport : enregistrement et alerte 6 mois ───────────────────────
+await page.goto(`${BASE}/settings/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+check("passeport : invite à saisir les dates",
+  /Ajoute les dates du passeport/.test(await page.locator("main").innerText()));
+
+await page.locator("#issued").fill("2020-03-01");
+await page.locator("#expiry").fill("2027-02-27"); // 6 mois pile après le 27.08.2026
+await page.waitForTimeout(300);
+await page.getByRole("button", { name: /Enregistrer dans le profil/ }).click();
+await page.waitForTimeout(600);
+const saved = await page.locator("body").innerText();
+check("passeport : confirmation d'enregistrement", /Passeport enregistré dans le profil/.test(saved));
+check("passeport : alerte à 6 mois de validité",
+  /Il reste moins de 6 mois de validité/.test(saved) && /27\.02\.2027/.test(saved));
+
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+const persisted = await page.locator("main").innerText();
+check("passeport : les dates sont persistées", /Il reste moins de 6 mois de validité/.test(persisted));
+
+// au-delà de 6 mois, pas d'alerte mais un état valide
+await page.locator("#expiry").fill("2030-01-01");
+await page.waitForTimeout(200);
+await page.getByRole("button", { name: /Enregistrer dans le profil/ }).click();
+await page.waitForTimeout(600);
+const ok2 = await page.locator("main").innerText();
+check("passeport : au-delà de 6 mois, état valide sans alerte",
+  /Valable jusqu'au 01\.01\.2030/.test(ok2) && !/moins de 6 mois/.test(ok2));
+
 // ── Changement de langue ──────────────────────────────────────────────
 // On remet les 4 séjours du TEST B : la section ci-dessus les avait
 // remplacés, et on veut revérifier les mêmes chiffres dans l'autre langue.

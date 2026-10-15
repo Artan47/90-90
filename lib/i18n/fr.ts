@@ -115,6 +115,10 @@ const fr: Messages = {
     suggestBody: "Plutôt que d'entrer le {wanted}, entre le {date} : tu pourras alors rester {n} {n#jour#jours}.",
     useSuggestion: "Utiliser cette date",
     openStayNote: "Tu es encore à l'intérieur. Le calcul suppose que tu sors le {date}.",
+    shortenTo: "Raccourcis : entre le {entry} et sors le {exit} ({n} {n#jour#jours}).",
+    postponeTo: "Ou décale : entre le {date} et reste tes {n} {n#jour#jours}.",
+    tooLongEver: "Aucun séjour ne peut dépasser 90 jours d'affilée.",
+    noLegalStay: "À cette date, tu ne peux pas entrer du tout.",
   },
 
   timeline: {
@@ -160,6 +164,11 @@ const fr: Messages = {
     notificationsUnsupported: "Ce navigateur ne gère pas les notifications.",
     storageWarning: "Le stockage local n'est pas disponible (navigation privée ?). Les données seront perdues à la fermeture. Utilise l'export.",
     about: "À propos",
+    passportSave: "Enregistrer dans le profil",
+    passportSaved: "Passeport enregistré dans le profil.",
+    passportExpiringMonths: "Il reste moins de 6 mois de validité : le passeport expire le {date} (encore {n} {n#jour#jours}).",
+    passportValidUntil: "Valable jusqu'au {date} — encore {n} {n#jour#jours}.",
+    passportNoDates: "Ajoute les dates du passeport pour être prévenu 6 mois avant l'expiration.",
   },
 
   about: {
@@ -207,6 +216,7 @@ const fr: Messages = {
   notifications: {
     under7: "Il ne te reste que {n} {n#jour#jours} sur 90.",
     under15: "Il te reste {n} {n#jour#jours} sur 90.",
+    passportSoon: "Le passeport expire le {date} — encore {n} {n#jour#jours}.",
   },
 
   common: {

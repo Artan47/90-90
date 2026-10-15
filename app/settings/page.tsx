@@ -8,7 +8,8 @@ import { Confirm } from "@/components/Confirm";
 import { downloadExport, fromImportString } from "@/lib/storage";
 import type { AppData } from "@/lib/types";
 import { statusOn } from "@/lib/schengen";
-import { addDays, diffDays, formatDate, isIsoDate } from "@/lib/date";
+import { passportStatus } from "@/lib/passport";
+import { formatDate } from "@/lib/date";
 import {
   notificationSupport, requestNotifications, runReminders,
   type NotificationSupport,
@@ -24,9 +25,19 @@ export default function SettingsPage() {
   const [notif, setNotif] = useState<NotificationSupport>("default");
   const [pendingClear, setPendingClear] = useState(false);
   const [pendingImport, setPendingImport] = useState<AppData | null>(null);
+  // Brouillon local : les dates ne rejoignent le profil qu'à l'enregistrement,
+  // pour que l'utilisateur voie que c'est bien pris en compte.
+  const [issuedDraft, setIssuedDraft] = useState("");
+  const [expiryDraft, setExpiryDraft] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setNotif(notificationSupport()), []);
+
+  useEffect(() => {
+    if (!ready) return;
+    setIssuedDraft(data.profile.passportIssued ?? "");
+    setExpiryDraft(data.profile.passportExpiry ?? "");
+  }, [ready, data.profile.passportIssued, data.profile.passportExpiry]);
 
   const status = useMemo(() => statusOn(stays, today), [stays, today]);
 
@@ -35,23 +46,25 @@ export default function SettingsPage() {
     window.setTimeout(() => setToast(null), 3000);
   }
 
-  // Contrôles du passeport (section 2.5 du cahier des charges).
-  const issued = data.profile.passportIssued;
-  const expiry = data.profile.passportExpiry;
+  // Date de sortie de référence pour la règle « 3 mois après la sortie ».
   const plannedExit = status.inside && status.mustLeaveBy
     ? status.mustLeaveBy
     : status.maxStay.days > 0
       ? status.maxStay.lastPossibleExit
       : null;
 
-  const passportTooOld =
-    isIsoDate(issued ?? "") && diffDays(issued!, today) > 3652; // > 10 ans
-  const passportExpired = isIsoDate(expiry ?? "") && diffDays(today, expiry!) < 0;
-  const passportTooShort =
-    !passportExpired &&
-    isIsoDate(expiry ?? "") &&
-    plannedExit !== null &&
-    diffDays(expiry!, addDays(plannedExit, 90)) > 0;
+  const passport = passportStatus(data.profile, today, plannedExit);
+  const dirty =
+    issuedDraft !== (data.profile.passportIssued ?? "") ||
+    expiryDraft !== (data.profile.passportExpiry ?? "");
+
+  function savePassport() {
+    setProfile({
+      passportIssued: issuedDraft || undefined,
+      passportExpiry: expiryDraft || undefined,
+    });
+    flash(t.settings.passportSaved);
+  }
 
   async function enableNotifications() {
     const result = await requestNotifications();
@@ -61,6 +74,7 @@ export default function SettingsPage() {
         today,
         remaining: status.remaining,
         mustLeaveBy: status.mustLeaveBy,
+        profile: data.profile,
         locale,
       });
     }
@@ -123,35 +137,49 @@ export default function SettingsPage() {
         <h2 className="font-bold">{t.settings.passport}</h2>
         <div className="grid grid-cols-2 gap-3">
           <Field label={t.settings.passportIssued} htmlFor="issued">
-            <DateInput
-              id="issued"
-              value={issued ?? ""}
-              onChange={(v) => setProfile({ passportIssued: v || undefined })}
-            />
+            <DateInput id="issued" value={issuedDraft} onChange={setIssuedDraft} />
           </Field>
           <Field label={t.settings.passportExpiry} htmlFor="expiry">
-            <DateInput
-              id="expiry"
-              value={expiry ?? ""}
-              onChange={(v) => setProfile({ passportExpiry: v || undefined })}
-            />
+            <DateInput id="expiry" value={expiryDraft} onChange={setExpiryDraft} />
           </Field>
         </div>
+
+        <Button onClick={savePassport} disabled={!dirty} className="w-full">
+          {t.settings.passportSave}
+        </Button>
+
         <p className="text-xs muted">{t.settings.passportHelp}</p>
 
-        {passportTooOld ? (
+        {!passport.hasExpiry ? (
+          <p className="text-xs muted">{t.settings.passportNoDates}</p>
+        ) : passport.expired ? (
+          <p className="rounded-xl bg-[var(--color-bad-soft)] px-3 py-2 text-sm font-medium text-[#7f1d1d]">
+            ⛔ {t.settings.passportExpired}
+          </p>
+        ) : passport.expiringSoon ? (
+          <p className="tnum rounded-xl bg-[var(--color-warn-soft)] px-3 py-2 text-sm font-medium text-[#7c2d12]">
+            ⚠️ {fmt(t.settings.passportExpiringMonths, {
+              date: formatDate(data.profile.passportExpiry ?? ""),
+              n: passport.daysUntilExpiry ?? 0,
+            })}
+          </p>
+        ) : (
+          <p className="tnum text-sm text-[var(--color-ok)]">
+            ✓ {fmt(t.settings.passportValidUntil, {
+              date: formatDate(data.profile.passportExpiry ?? ""),
+              n: passport.daysUntilExpiry ?? 0,
+            })}
+          </p>
+        )}
+
+        {passport.tooOld ? (
           <p className="rounded-xl bg-[var(--color-warn-soft)] px-3 py-2 text-sm text-[#7c2d12]">
-            {t.settings.passportTooOld}
+            ⚠️ {t.settings.passportTooOld}
           </p>
         ) : null}
-        {passportExpired ? (
-          <p className="rounded-xl bg-[var(--color-bad-soft)] px-3 py-2 text-sm text-[#7f1d1d]">
-            {t.settings.passportExpired}
-          </p>
-        ) : null}
-        {passportTooShort && plannedExit ? (
+        {passport.insufficientForExit && plannedExit ? (
           <p className="rounded-xl bg-[var(--color-warn-soft)] px-3 py-2 text-sm text-[#7c2d12]">
-            {fmt(t.settings.passportExpiringSoon, { date: formatDate(plannedExit) })}
+            ⚠️ {fmt(t.settings.passportExpiringSoon, { date: formatDate(plannedExit) })}
           </p>
         ) : null}
       </Card>

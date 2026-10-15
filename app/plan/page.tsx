@@ -5,7 +5,7 @@ import { useStore } from "@/components/Store";
 import { Button, Card, DateInput, Field, PageTitle, Select, Toast } from "@/components/ui";
 import {
   maxStayFrom, simulate, remainingOn, earliestReentry, suggestEntryFor,
-  currentStay,
+  currentStay, MAX_DAYS,
 } from "@/lib/schengen";
 import { countriesForPicker } from "@/lib/schengen-membership";
 import { formatDate, isIsoDate, isBefore, inclusiveDays } from "@/lib/date";
@@ -46,11 +46,23 @@ export default function PlanPage() {
     [mode, stays, entry, wanted],
   );
 
-  // Si le séjour demandé déborde, on propose la première date qui tiendrait
-  // la MÊME durée — c'est la question que se pose vraiment le voyageur.
+  /**
+   * Deux remèdes distincts quand le séjour demandé déborde :
+   *   A. le raccourcir sur place (sortie au dernier jour légal) ;
+   *   B. le décaler à la première date qui tient la durée voulue.
+   * Un séjour de plus de 90 jours n'a pas de remède B : aucune date ne
+   * permet jamais plus de 90 jours d'affilée.
+   */
   const rescue = useMemo(() => {
     if (mode !== "range" || !verdict || verdict.result.ok) return null;
-    return suggestEntryFor(stays, entry, verdict.days);
+    const wantedTooLong = verdict.days > MAX_DAYS;
+    const postpone = wantedTooLong ? null : suggestEntryFor(stays, entry, verdict.days);
+    return {
+      shortenExit: verdict.result.maxLegalExit ?? null,
+      shortenDays: verdict.result.maxLegalDays ?? 0,
+      wantedTooLong,
+      postpone: postpone && postpone.entry && postpone.entry !== entry ? postpone : null,
+    };
   }, [mode, verdict, stays, entry]);
 
   function savePlanned() {
@@ -236,26 +248,55 @@ export default function PlanPage() {
         )
       ) : null}
 
-      {rescue && rescue.entry ? (
-        <Card className="border-[var(--color-ok)]">
+      {rescue ? (
+        <Card className="border-[var(--color-ok)] space-y-3">
           <p className="text-sm font-semibold">💡 {t.plan.suggestTitle}</p>
-          <p className="tnum mt-1 text-sm">
-            {fmt(t.plan.suggestBody, {
-              wanted: formatDate(entry),
-              date: formatDate(rescue.entry),
-              n: rescue.wanted,
-            })}
-          </p>
-          <Button
-            variant="ghost"
-            className="mt-3 w-full"
-            onClick={() => {
-              setEntry(rescue.entry!);
-              setExit(rescue.exit!);
-            }}
-          >
-            {t.plan.useSuggestion}
-          </Button>
+
+          {rescue.wantedTooLong ? (
+            <p className="text-sm muted">{t.plan.tooLongEver}</p>
+          ) : null}
+
+          {rescue.shortenExit && rescue.shortenDays > 0 ? (
+            <div>
+              <p className="tnum text-sm">
+                {fmt(t.plan.shortenTo, {
+                  entry: formatDate(entry),
+                  exit: formatDate(rescue.shortenExit),
+                  n: rescue.shortenDays,
+                })}
+              </p>
+              <Button
+                variant="ghost"
+                className="mt-2 w-full"
+                onClick={() => setExit(rescue.shortenExit!)}
+              >
+                {t.plan.useSuggestion}
+              </Button>
+            </div>
+          ) : (
+            <p className="text-sm muted">{t.plan.noLegalStay}</p>
+          )}
+
+          {rescue.postpone ? (
+            <div className="border-t border-[var(--border)] pt-3">
+              <p className="tnum text-sm">
+                {fmt(t.plan.postponeTo, {
+                  date: formatDate(rescue.postpone.entry!),
+                  n: rescue.postpone.wanted,
+                })}
+              </p>
+              <Button
+                variant="ghost"
+                className="mt-2 w-full"
+                onClick={() => {
+                  setEntry(rescue.postpone!.entry!);
+                  setExit(rescue.postpone!.exit!);
+                }}
+              >
+                {t.plan.useSuggestion}
+              </Button>
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
