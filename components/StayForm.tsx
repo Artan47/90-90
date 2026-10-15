@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { Stay } from "@/lib/types";
 import { Button, DateInput, Field, Select } from "@/components/ui";
-import { countriesForPicker } from "@/lib/schengen-membership";
+import { countriesForPicker, DEFAULT_COUNTRY } from "@/lib/schengen-membership";
 import { isIsoDate, isBefore } from "@/lib/date";
 import { useT } from "@/components/Store";
 
@@ -25,7 +25,7 @@ export function StayForm({
 }) {
   const [entry, setEntry] = useState(initial?.entry ?? "");
   const [exit, setExit] = useState(initial?.exit ?? "");
-  const [country, setCountry] = useState(initial?.country ?? "DE");
+  const [country, setCountry] = useState(initial?.country ?? DEFAULT_COUNTRY);
   const [error, setError] = useState<string | null>(null);
   const t = useT();
 

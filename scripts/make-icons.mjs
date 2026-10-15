@@ -4,8 +4,9 @@
  *
  *   node scripts/make-icons.mjs
  *
- * L'icône est un disque bleu portant « 90 » en blanc, dessiné pixel par
- * pixel — pas de rendu de police, donc pas de fichier externe à charger.
+ * L'icône reprend les couleurs du drapeau albanais : champ ROUGE, chiffre
+ * « 90 » en NOIR, dessiné pixel par pixel — pas de rendu de police, donc
+ * aucun fichier externe à charger.
  */
 import { deflateSync } from "node:zlib";
 import { writeFileSync, mkdirSync } from "node:fs";
@@ -67,8 +68,8 @@ const GLYPHS = {
 
 function makeIcon(size, { maskable = false } = {}) {
   const px = Buffer.alloc(size * size * 4);
-  const bg = [37, 99, 235, 255];      // bleu
-  const fg = [255, 255, 255, 255];
+  const bg = [228, 30, 32, 255];   // rouge du drapeau albanais
+  const fg = [10, 10, 10, 255];    // noir du drapeau albanais
   const c = (size - 1) / 2;
   // Une icône « maskable » doit rester lisible une fois rognée en cercle :
   // on remplit tout le carré au lieu de dessiner un disque.

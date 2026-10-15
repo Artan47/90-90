@@ -12,7 +12,7 @@ import {
 } from "react";
 import type { AppData, Person, Profile, Stay } from "@/lib/types";
 import { emptyData, activePerson, makePerson } from "@/lib/types";
-import { loadData, saveData, newId, isStorageAvailable } from "@/lib/storage";
+import { loadData, saveData, newId, isStorageAvailable, peekLocale } from "@/lib/storage";
 import { todayIso, type IsoDate } from "@/lib/date";
 import {
   detectLocale, getMessages, fill, DEFAULT_LOCALE,
@@ -65,7 +65,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   // serveur, et l'hydratation doit partir du même état vide.
   useEffect(() => {
     const detectedLocale = detectLocale();
-    const defaultName = getMessages(detectedLocale).people.defaultName;
+    // La langue DÉJÀ enregistrée l'emporte sur celle du navigateur pour
+    // nommer la personne par défaut.
+    const defaultName = getMessages(peekLocale() ?? detectedLocale).people.defaultName;
     let loaded = loadData(defaultName);
     // Premier lancement : on crée d'emblée une personne, pour que l'app
     // soit utilisable sans configuration. Le multi-personnes reste donc

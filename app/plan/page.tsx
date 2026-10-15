@@ -7,7 +7,7 @@ import {
   maxStayFrom, simulate, remainingOn, earliestReentry, suggestEntryFor,
   currentStay, closeOpenStays, stayMilestones, MAX_DAYS,
 } from "@/lib/schengen";
-import { countriesForPicker } from "@/lib/schengen-membership";
+import { countriesForPicker, DEFAULT_COUNTRY } from "@/lib/schengen-membership";
 import { formatDate, isIsoDate, isBefore, inclusiveDays, addDays } from "@/lib/date";
 
 type Mode = "enter" | "range" | "want";
@@ -18,7 +18,7 @@ export default function PlanPage() {
   const [entry, setEntry] = useState(today);
   const [exit, setExit] = useState("");
   const [wanted, setWanted] = useState(30);
-  const [country, setCountry] = useState("DE");
+  const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [toast, setToast] = useState<string | null>(null);
 
   // Si un séjour est en cours, toutes les projections supposent qu'on sort

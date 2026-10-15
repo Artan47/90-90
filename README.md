@@ -313,7 +313,7 @@ d'écran dans l'application.
 
 ## Déploiement
 
-Export statique (`output: "export"`), déployable tel quel sur Vercel ou tout
+Export statique (`output: "export"`), déployable tel quel sur n'importe quel
 hébergeur de fichiers :
 
 ```bash
@@ -322,6 +322,9 @@ npm run build   # produit out/
 
 Servir `out/` en HTTPS — le service worker et l'installation sur l'écran
 d'accueil l'exigent.
+
+Marche à suivre détaillée pour **www.sadite.ch** chez Infomaniak :
+[DEPLOIEMENT.md](DEPLOIEMENT.md).
 
 ## Langues
 

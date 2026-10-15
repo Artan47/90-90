@@ -4,14 +4,28 @@
  * Aucune police distante : uniquement la pile système. C'est une exigence de
  * confidentialité (aucune requête vers un domaine tiers), pas une préférence.
  */
+/*
+ * IDENTITÉ VISUELLE — drapeau albanais : rouge et noir.
+ *
+ * Le rouge du drapeau (#E41E20) est très proche du rouge « danger » du
+ * compteur. Pour qu'aucune confusion ne soit possible, la marque s'exprime
+ * en NOIR (l'autre couleur du drapeau), le rouge n'intervenant qu'en
+ * accent : le liseré de l'en-tête et l'icône. Les couleurs d'état du
+ * compteur — vert, orange, rouge — restent strictement réservées à la
+ * lecture du quota.
+ */
 @theme {
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --color-ink: #0b1220;
-  --color-ink-soft: #1a2434;
-  --color-paper: #f6f7fb;
+  --color-ink: #0a0a0a;
+  --color-ink-soft: #1c1c1c;
+  --color-paper: #faf8f7;
+
+  /* Rouge du drapeau albanais — réservé à la marque, jamais à un état. */
+  --color-brand: #e41e20;
+  --color-brand-dark: #b71518;
 
   --color-ok: #16a34a;
   --color-ok-soft: #dcfce7;
@@ -24,20 +38,26 @@
 
 :root {
   color-scheme: light dark;
-  --bg: #f6f7fb;
+  --bg: #faf8f7;
   --surface: #ffffff;
-  --border: #e4e7ee;
-  --text: #0b1220;
-  --text-muted: #5b6577;
+  --border: #e8e3e1;
+  --text: #0a0a0a;
+  --text-muted: #6b625f;
+  --brand: #e41e20;
+  --header-bg: #0a0a0a;
+  --header-text: #ffffff;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0b1220;
-    --surface: #141c2b;
-    --border: #253044;
-    --text: #f2f5fa;
-    --text-muted: #94a1b8;
+    --bg: #121010;
+    --surface: #1e1b1b;
+    --border: #322d2d;
+    --text: #f7f4f3;
+    --text-muted: #a39a98;
+    --brand: #ff3b3d;
+    --header-bg: #000000;
+    --header-text: #ffffff;
   }
 }
 
@@ -81,6 +101,13 @@ button {
 
 .ring-track {
   stroke: var(--border);
+}
+
+/* En-tête : noir du drapeau, souligné du rouge du drapeau. */
+@utility header-band {
+  background: var(--header-bg);
+  color: var(--header-text);
+  border-bottom: 3px solid var(--brand);
 }
 
 @keyframes pop {

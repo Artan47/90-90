@@ -40,16 +40,20 @@ export function PersonBar() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex w-full items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-left"
+        className="header-band flex w-full items-center justify-between gap-2 px-4 py-2.5 text-left"
         aria-haspopup="dialog"
       >
         <span className="flex min-w-0 items-center gap-2">
-          <span aria-hidden>👤</span>
+          <span
+            aria-hidden
+            className="inline-block h-4 w-4 shrink-0 rounded-sm"
+            style={{ background: "var(--brand)" }}
+          />
           <span className="truncate font-semibold">
             {person ? person.name : t.people.addFirst}
           </span>
         </span>
-        <span className="shrink-0 text-xs muted">
+        <span className="shrink-0 text-xs opacity-70">
           {people.length > 1 ? `${people.length} · ` : ""}
           {t.people.switch} ▾
         </span>

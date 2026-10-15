@@ -159,6 +159,15 @@ const BY_CODE: ReadonlyMap<string, CountryInfo> = new Map(
   COUNTRIES.map((c) => [c.code, c]),
 );
 
+/**
+ * Pays proposé par défaut.
+ *
+ * Les utilisateurs visés viennent du Kosovo, de Macédoine du Nord ou
+ * d'Albanie — donc de HORS Schengen — et se rendent en Suisse. Proposer
+ * autre chose les obligerait à corriger le champ à chaque saisie.
+ */
+export const DEFAULT_COUNTRY = "CH";
+
 export function getCountry(code: string): CountryInfo | undefined {
   return BY_CODE.get(code.toUpperCase());
 }
@@ -182,9 +191,15 @@ export function countsEver(code: string): boolean {
   return Boolean(country && country.since !== null);
 }
 
-/** Liste triée par nom albanais, pour les sélecteurs. */
+/**
+ * Liste pour les sélecteurs : la Suisse d'abord (destination de très loin
+ * la plus fréquente), puis les autres pays Schengen par ordre alphabétique,
+ * puis les pays qui ne consomment pas le quota.
+ */
 export function countriesForPicker(): CountryInfo[] {
   return [...COUNTRIES].sort((a, b) => {
+    if (a.code === DEFAULT_COUNTRY) return -1;
+    if (b.code === DEFAULT_COUNTRY) return 1;
     const aCounts = a.since !== null;
     const bCounts = b.since !== null;
     if (aCounts !== bCounts) return aCounts ? -1 : 1;

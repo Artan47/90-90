@@ -47,6 +47,13 @@ export const MAX_ITERATIONS = 400;
 /** Borne inférieure d'examen : antérieure à tout séjour saisissable. */
 const EARLIEST: IsoDate = "1900-01-01";
 
+/**
+ * Pays utilisé pour les séjours simulés : un membre de Schengen de longue
+ * date, donc toujours comptabilisé quelle que soit la date. Le quota est
+ * commun à tout l'espace, le choix n'a aucune incidence sur le résultat.
+ */
+const PROBE_COUNTRY = "CH";
+
 // ──────────────────────────────────────────────────────────────────────
 // Fenêtre
 // ──────────────────────────────────────────────────────────────────────
@@ -506,7 +513,7 @@ export function simulate(
   const real = stays.filter((s) => !s.planned);
   const withTrip: Stay[] = [
     ...real,
-    { id: "__trip__", entry: trip.entry, exit: trip.exit, country: "DE" },
+    { id: "__trip__", entry: trip.entry, exit: trip.exit, country: PROBE_COUNTRY },
   ];
 
   let firstOverflowDate: IsoDate | undefined;

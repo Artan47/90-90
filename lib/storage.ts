@@ -13,7 +13,7 @@
 import type { AppData, Person, Profile, Stay } from "./types";
 import { emptyData } from "./types";
 import { isIsoDate } from "./date";
-import { isLocale } from "./i18n";
+import { isLocale, type Locale } from "./i18n";
 
 const KEY = "sa-dite:v1";
 
@@ -148,6 +148,28 @@ function sanitizePerson(raw: unknown, defaultName: string): Person[] {
       profile,
     },
   ];
+}
+
+/**
+ * Langue enregistrée, lue SANS parser toute la sauvegarde.
+ *
+ * Sert à nommer correctement la personne créée par défaut : sans ça, le
+ * nom viendrait de la langue du navigateur alors que l'utilisateur a pu en
+ * choisir une autre, et on afficherait « Unë » dans une interface
+ * française.
+ */
+export function peekLocale(): Locale | null {
+  const raw = readRaw();
+  if (!raw) return null;
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    if (isLocale(obj.locale)) return obj.locale;
+    const profile = obj.profile as Record<string, unknown> | undefined;
+    if (profile && isLocale(profile.locale)) return profile.locale; // version 1
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export function loadData(defaultName = "Unë"): AppData {

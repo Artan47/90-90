@@ -7,6 +7,7 @@ import { Ring } from "@/components/Ring";
 import { Button, Card, Toast } from "@/components/ui";
 import { toneFor, TONE_HEX, TONE_TEXT } from "@/components/status-color";
 import { statusOn, MAX_DAYS, currentStay } from "@/lib/schengen";
+import { DEFAULT_COUNTRY } from "@/lib/schengen-membership";
 import { formatDate, diffDays, todayIso } from "@/lib/date";
 import { runReminders } from "@/lib/notifications";
 import { InstallPrompt } from "@/components/InstallPrompt";
@@ -45,7 +46,7 @@ export default function HomePage() {
       return;
     }
     // Le pays est modifiable ensuite : à l'aéroport, on veut un seul geste.
-    addStay({ entry: todayIso(), exit: null, country: "DE" });
+    addStay({ entry: todayIso(), exit: null, country: DEFAULT_COUNTRY });
     flash(t.home.entryRecorded);
   }
 
