@@ -124,6 +124,12 @@ const sq = {
     postponeTo: "Ose shtyje: hyr më {date} dhe rri {n} ditë.",
     tooLongEver: "Asnjë qëndrim nuk mund të kalojë 90 ditë rresht.",
     noLegalStay: "Me këtë datë nuk mund të hysh fare.",
+    milestonesTitle: "Pritja ndryshon shumë",
+    milestonesHelp: "Ditët jashtë Schengenit NUK shtohen në kuotë. Kuota rritet vetëm kur një ditë e vjetër del nga dritarja 180-ditore — prandaj ka kërcime.",
+    milestoneRow: "Hyr më {date} → {n} ditë (deri më {exit})",
+    milestoneWait: "prit {n} ditë",
+    milestoneNow: "data e zgjedhur",
+    milestoneNoGain: "Deri më {date} kuota nuk ndryshon fare.",
   },
 
   timeline: {

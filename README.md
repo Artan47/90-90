@@ -61,6 +61,7 @@ test qui échouerait si la logique était naïve.
 | « 90 jours dehors = 90 jours de crédit rendus » | Après un séjour continu de 90 jours, 90 jours d'absence ne rendent **qu'un seul jour**. Le crédit revient jour par jour, à mesure que chaque jour consommé sort de la fenêtre. | TEST A |
 | « Les jours restants aujourd'hui = la durée maximale du prochain séjour » | Faux, et très en dessous de la réalité : pendant le séjour, d'anciens jours continuent de sortir de la fenêtre. **40 jours restants permettent 70 jours consécutifs.** | TEST B |
 | « La fenêtre part de demain / de la veille » | La fenêtre est `[D − 179 ; D]`, bornes incluses, soit exactement 180 jours. Un décalage d'un jour fausse tout le calcul. | TEST 1 |
+| « Les jours passés dehors s'ajoutent au quota » | Non. Attendre une semaine hors Schengen n'ajoute rien **en soi** : le quota ne remonte que lorsqu'un ancien jour de présence **sort** de la fenêtre de 180 jours. D'où des paliers brutaux — dans un cas réel, entrer deux jours plus tard fait passer de 13 à 43 jours possibles. | `stayMilestones` |
 
 ### Ce que la règle ne couvre pas
 
@@ -183,6 +184,7 @@ Toutes les fonctions de `lib/schengen.ts` sont pures :
 | `plannedOutlook(stays, today)` | Juge les voyages planifiés **en bloc**, pas un par un |
 | `summarize(stays, today)` | Nombre de séjours réels et total de jours |
 | `suggestEntryFor(stays, from, n)` | Première date d'entrée permettant `n` jours d'affilée |
+| `stayMilestones(stays, from)` | Paliers : les dates à partir desquelles on peut rester plus longtemps |
 | `closeOpenStays(stays, day)` | Ferme les séjours ouverts : hypothèse explicite des projections |
 | `statusOn(stays, today)` | Vue d'ensemble de l'écran d'accueil |
 

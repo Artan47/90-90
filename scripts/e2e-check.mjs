@@ -284,6 +284,33 @@ const verdict = await page.locator("body").innerText();
 check(`planificateur : la date proposée (${proposed}) est validée`,
   /Ce voyage est autorisé/.test(verdict) && /55 jours/.test(verdict));
 
+// ── Paliers : « attendre quelques jours ne change rien… puis tout » ───
+await page.evaluate(() => {
+  const d = JSON.parse(localStorage.getItem("sa-dite:v1"));
+  d.profile.locale = "fr";
+  d.stays = [
+    { id: "1", entry: "2026-05-10", exit: "2026-06-08", country: "DE" },
+    { id: "2", entry: "2026-06-20", exit: "2026-07-09", country: "DE" },
+    { id: "3", entry: "2026-08-01", exit: "2026-08-15", country: "DE" },
+    { id: "4", entry: "2026-09-20", exit: "2026-10-01", country: "DE" },
+  ];
+  localStorage.setItem("sa-dite:v1", JSON.stringify(d));
+});
+await page.goto(`${BASE}/plan/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+await page.locator("#p-entry").fill("2026-10-22");
+await page.waitForTimeout(700);
+const mst = await page.locator("main").innerText();
+check("paliers : 13 jours à la date choisie", /22\.10\.2026 → 13 jours/.test(mst));
+check("paliers : 43 jours deux jours plus tard", /24\.10\.2026 → 43 jours/.test(mst));
+check("paliers : va jusqu'à 90 jours", /→ 90 jours/.test(mst));
+check("paliers : dit jusqu'à quand rien ne bouge",
+  /Jusqu'au 23\.10\.2026, le quota ne bouge pas/.test(mst));
+check("paliers : explique que les jours dehors n'ajoutent rien",
+  /ne s'ajoutent PAS au quota/.test(mst));
+check("paliers : la première ligne n'est pas étiquetée « aujourd'hui »",
+  /la date choisie/.test(mst) && !/13 jours \(jusqu'au 03\.11\.2026\) — aujourd'hui/.test(mst));
+
 // ── Dépassement : le chiffre ne doit PAS saturer à 90 ─────────────────
 await page.evaluate(() => {
   const d = JSON.parse(localStorage.getItem("sa-dite:v1"));

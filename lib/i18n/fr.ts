@@ -119,6 +119,12 @@ const fr: Messages = {
     postponeTo: "Ou décale : entre le {date} et reste tes {n} {n#jour#jours}.",
     tooLongEver: "Aucun séjour ne peut dépasser 90 jours d'affilée.",
     noLegalStay: "À cette date, tu ne peux pas entrer du tout.",
+    milestonesTitle: "Attendre change tout",
+    milestonesHelp: "Les jours passés hors Schengen ne s'ajoutent PAS au quota. Le quota remonte seulement quand un ancien jour sort de la fenêtre de 180 jours — d'où ces paliers.",
+    milestoneRow: "Entre le {date} → {n} {n#jour#jours} (jusqu'au {exit})",
+    milestoneWait: "attends {n} {n#jour#jours}",
+    milestoneNow: "la date choisie",
+    milestoneNoGain: "Jusqu'au {date}, le quota ne bouge pas du tout.",
   },
 
   timeline: {

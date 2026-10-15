@@ -6,8 +6,9 @@ import {
   maxStayFrom, earliestReentry, fullResetDate, simulate, timeline, validate,
   stayDays, currentStay, mustLeaveBy, statusOn, materializePlanned,
   MAX_ITERATIONS, plannedOutlook, summarize, suggestEntryFor, closeOpenStays,
+  stayMilestones,
 } from "./schengen";
-import { inclusiveDays, addDays, isBefore, isSameOrAfter } from "./date";
+import { inclusiveDays, addDays, isBefore, isSameOrAfter, isAfter } from "./date";
 
 /** Fabrique un séjour ; l'id est dérivé des dates pour la lisibilité. */
 function stay(entry: string, exit: string | null, extra: Partial<Stay> = {}): Stay {
@@ -349,6 +350,72 @@ describe("maxStayFrom — bornes", () => {
 
   it("ne dépasse jamais 90 jours consécutifs", () => {
     expect(maxStayFrom([], "2026-06-15").days).toBeLessThanOrEqual(90);
+  });
+});
+
+describe("stayMilestones — quand le quota remonte vraiment", () => {
+  // Historique réel d'un voyageur fréquent : 77 jours consommés au 15.10.
+  const history = [
+    stay("2026-05-10", "2026-06-08"), // 30
+    stay("2026-06-20", "2026-07-09"), // 20
+    stay("2026-08-01", "2026-08-15"), // 15
+    stay("2026-09-20", "2026-10-01"), // 12
+  ];
+  const today = "2026-10-15";
+
+  it("part bien de la situation du jour", () => {
+    expect(remainingOn(history, today)).toBe(13);
+    const m = stayMilestones(history, today);
+    expect(m[0]!.entry).toBe(today);
+    expect(m[0]!.days).toBe(13);
+    expect(m[0]!.waitDays).toBe(0);
+  });
+
+  it("montre qu'attendre quelques jours ne change parfois RIEN", () => {
+    // Du 15.10 au 23.10, le maximum reste à 13 : aucun ancien jour ne sort
+    // de la fenêtre. C'est le cœur du malentendu.
+    for (const d of ["2026-10-16", "2026-10-20", "2026-10-22", "2026-10-23"]) {
+      expect({ d, days: maxStayFrom(history, d).days }).toEqual({ d, days: 13 });
+    }
+  });
+
+  it("…puis qu'un seul jour de plus change tout", () => {
+    expect(maxStayFrom(history, "2026-10-24").days).toBe(43);
+    const m = stayMilestones(history, today);
+    expect(m[1]!.entry).toBe("2026-10-24");
+    expect(m[1]!.days).toBe(43);
+    expect(m[1]!.waitDays).toBe(9);
+  });
+
+  it("les paliers sont strictement croissants et s'arrêtent à 90", () => {
+    const m = stayMilestones(history, today);
+    for (let i = 1; i < m.length; i++) {
+      expect(m[i]!.days).toBeGreaterThan(m[i - 1]!.days);
+      expect(isAfter(m[i]!.entry, m[i - 1]!.entry)).toBe(true);
+    }
+    expect(m[m.length - 1]!.days).toBe(90);
+    expect(m.length).toBeLessThanOrEqual(6);
+  });
+
+  it("chaque palier est réellement tenable", () => {
+    for (const ms of stayMilestones(history, today)) {
+      expect(inclusiveDays(ms.entry, ms.lastExit)).toBe(ms.days);
+      expect(simulate(history, { entry: ms.entry, exit: ms.lastExit }).ok).toBe(true);
+      // et un jour de plus ne tient pas
+      expect(simulate(history, { entry: ms.entry, exit: addDays(ms.lastExit, 1) }).ok).toBe(false);
+    }
+  });
+
+  it("sans historique, un seul palier à 90 jours", () => {
+    const m = stayMilestones([], "2026-01-01");
+    expect(m).toHaveLength(1);
+    expect(m[0]!.days).toBe(90);
+  });
+
+  it("tient compte d'un séjour en cours", () => {
+    const m = stayMilestones([stay("2026-08-01", null)], today);
+    expect(m.length).toBeGreaterThan(0);
+    expect(m[m.length - 1]!.days).toBe(90);
   });
 });
 

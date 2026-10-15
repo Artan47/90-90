@@ -5,10 +5,10 @@ import { useStore } from "@/components/Store";
 import { Button, Card, DateInput, Field, PageTitle, Select, Toast } from "@/components/ui";
 import {
   maxStayFrom, simulate, remainingOn, earliestReentry, suggestEntryFor,
-  currentStay, MAX_DAYS,
+  currentStay, closeOpenStays, stayMilestones, MAX_DAYS,
 } from "@/lib/schengen";
 import { countriesForPicker } from "@/lib/schengen-membership";
-import { formatDate, isIsoDate, isBefore, inclusiveDays } from "@/lib/date";
+import { formatDate, isIsoDate, isBefore, inclusiveDays, addDays } from "@/lib/date";
 
 type Mode = "enter" | "range" | "want";
 
@@ -25,9 +25,19 @@ export default function PlanPage() {
   // à la date de référence. L'hypothèse doit être visible, pas implicite.
   const open = useMemo(() => currentStay(stays, today), [stays, today]);
 
+  // Toutes les projections partent du même historique : séjour en cours
+  // clos à aujourd'hui. C'est exactement l'hypothèse affichée au-dessus.
+  const base = useMemo(() => closeOpenStays(stays, today), [stays, today]);
+
+  // Paliers : les dates à partir desquelles on peut rester plus longtemps.
+  const milestones = useMemo(
+    () => (mode === "enter" && isIsoDate(entry) ? stayMilestones(base, entry) : []),
+    [mode, base, entry],
+  );
+
   const maxStay = useMemo(
-    () => (isIsoDate(entry) ? maxStayFrom(stays, entry) : null),
-    [stays, entry],
+    () => (isIsoDate(entry) ? maxStayFrom(base, entry) : null),
+    [base, entry],
   );
 
   const verdict = useMemo(() => {
@@ -35,15 +45,15 @@ export default function PlanPage() {
     if (!isIsoDate(entry) || !isIsoDate(exit)) return null;
     if (isBefore(exit, entry)) return null;
     return {
-      result: simulate(stays, { entry, exit }),
+      result: simulate(base, { entry, exit }),
       days: inclusiveDays(entry, exit),
     };
-  }, [mode, stays, entry, exit]);
+  }, [mode, base, entry, exit]);
 
   // « Je veux rester N jours » : première date d'entrée qui le permet.
   const suggestion = useMemo(
-    () => (mode === "want" && isIsoDate(entry) ? suggestEntryFor(stays, entry, wanted) : null),
-    [mode, stays, entry, wanted],
+    () => (mode === "want" && isIsoDate(entry) ? suggestEntryFor(base, entry, wanted) : null),
+    [mode, base, entry, wanted],
   );
 
   /**
@@ -56,14 +66,14 @@ export default function PlanPage() {
   const rescue = useMemo(() => {
     if (mode !== "range" || !verdict || verdict.result.ok) return null;
     const wantedTooLong = verdict.days > MAX_DAYS;
-    const postpone = wantedTooLong ? null : suggestEntryFor(stays, entry, verdict.days);
+    const postpone = wantedTooLong ? null : suggestEntryFor(base, entry, verdict.days);
     return {
       shortenExit: verdict.result.maxLegalExit ?? null,
       shortenDays: verdict.result.maxLegalDays ?? 0,
       wantedTooLong,
       postpone: postpone && postpone.entry && postpone.entry !== entry ? postpone : null,
     };
-  }, [mode, verdict, stays, entry]);
+  }, [mode, verdict, base, entry]);
 
   function savePlanned() {
     if (!isIsoDate(entry) || !isIsoDate(exit)) return;
@@ -151,10 +161,10 @@ export default function PlanPage() {
             <p className="mt-3 text-xs muted">
               {fmt(t.plan.remainingAfter, {
                 date: formatDate(maxStay.lastPossibleExit),
-                n: remainingOn(stays, maxStay.lastPossibleExit),
+                n: remainingOn(base, maxStay.lastPossibleExit),
               })}
             </p>
-            {maxStay.days > remainingOn(stays, entry) ? (
+            {maxStay.days > remainingOn(base, entry) ? (
               <p className="mt-2 rounded-xl bg-[var(--color-ok-soft)] px-3 py-2 text-xs text-[#14532d]">
                 💡 {t.plan.whyMore}
               </p>
@@ -167,11 +177,45 @@ export default function PlanPage() {
             </p>
             <p className="mt-1 text-sm muted">
               {fmt(t.plan.resultTryAfter, {
-                date: formatDate(earliestReentry(stays, entry)),
+                date: formatDate(earliestReentry(base, entry)),
               })}
             </p>
           </Card>
         )
+      ) : null}
+
+      {mode === "enter" && milestones.length > 1 ? (
+        <Card className="space-y-2">
+          <p className="text-sm font-semibold">📈 {t.plan.milestonesTitle}</p>
+          <ul className="tnum space-y-1.5 text-sm">
+            {milestones.map((ms, i) => (
+              <li key={ms.entry} className="flex items-start gap-2">
+                <span aria-hidden className="muted">{i === 0 ? "•" : "↳"}</span>
+                <span>
+                  {fmt(t.plan.milestoneRow, {
+                    date: formatDate(ms.entry),
+                    n: ms.days,
+                    exit: formatDate(ms.lastExit),
+                  })}
+                  <span className="muted">
+                    {" — "}
+                    {ms.waitDays === 0
+                      ? t.plan.milestoneNow
+                      : fmt(t.plan.milestoneWait, { n: ms.waitDays })}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {milestones[1] && milestones[1].waitDays > 1 ? (
+            <p className="tnum text-xs muted">
+              {fmt(t.plan.milestoneNoGain, {
+                date: formatDate(addDays(milestones[1].entry, -1)),
+              })}
+            </p>
+          ) : null}
+          <p className="text-xs muted">{t.plan.milestonesHelp}</p>
+        </Card>
       ) : null}
 
       {mode === "want" && suggestion ? (

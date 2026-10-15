@@ -410,6 +410,56 @@ export function fullResetDate(stays: Stay[], from: IsoDate): IsoDate {
   return maxDate(from, addDays(last, WINDOW));
 }
 
+/**
+ * Paliers du séjour maximal : les dates d'entrée à partir desquelles on
+ * peut rester plus longtemps.
+ *
+ * Répond à la question que tout le monde se pose, et à laquelle l'intuition
+ * répond faux : « si j'attends une semaine de plus, j'ai une semaine de
+ * plus ? » Non — les jours passés dehors n'ajoutent RIEN. Le quota remonte
+ * uniquement quand un ancien jour de présence sort de la fenêtre de 180
+ * jours. D'où des paliers brutaux : deux jours d'attente peuvent ne rien
+ * changer, ou faire passer de 13 à 43 jours.
+ */
+export interface StayMilestone {
+  entry: IsoDate;
+  days: number;
+  lastExit: IsoDate;
+  /** Jours à attendre depuis la date de départ de la recherche. */
+  waitDays: number;
+}
+
+export function stayMilestones(
+  stays: Stay[],
+  from: IsoDate,
+  horizonDays = 200,
+  maxCount = 6,
+): StayMilestone[] {
+  // Hypothèse unique et explicite : un séjour en cours se termine à `from`.
+  // Sans ça, en sondant des dates d'entrée de plus en plus lointaines, on
+  // supposerait que la personne reste à l'intérieur jusqu'à la veille de
+  // chacune — ce qui n'a aucun sens pour une date dans six mois.
+  const closed = closeOpenStays(stays, from);
+  const out: StayMilestone[] = [];
+  let previous = -1;
+
+  for (let i = 0; i <= horizonDays; i++) {
+    const entry = addDays(from, i);
+    const max = maxStayFrom(closed, entry);
+    if (max.days > previous) {
+      out.push({
+        entry,
+        days: max.days,
+        lastExit: max.lastPossibleExit,
+        waitDays: i,
+      });
+      previous = max.days;
+      if (max.days >= MAX_DAYS || out.length >= maxCount) break;
+    }
+  }
+  return out;
+}
+
 // ──────────────────────────────────────────────────────────────────────
 // Simulation
 // ──────────────────────────────────────────────────────────────────────
