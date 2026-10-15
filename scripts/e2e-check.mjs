@@ -151,6 +151,60 @@ const offlineHome = await page.locator("main span").first().innerText();
 check("hors ligne : le calcul fonctionne toujours", offlineHome.trim() === "40", `affiché « ${offlineHome.trim()} »`);
 await context.setOffline(false);
 
+// ── Changement de langue ──────────────────────────────────────────────
+await page.goto(`${BASE}/settings/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(500);
+check("réglages : sélecteur de langue présent",
+  (await page.locator("body").innerText()).includes("Français"));
+
+await page.getByRole("button", { name: "Français" }).click();
+await page.waitForTimeout(500);
+const frText = await page.locator("body").innerText();
+check("bascule en français", frText.includes("Réglages") && frText.includes("Passeport"));
+check("bandeau juridique traduit", /aucune valeur juridique/i.test(frText));
+check("attribut lang mis à jour",
+  (await page.evaluate(() => document.documentElement.lang)) === "fr");
+
+await page.goto(BASE, { waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+const frHome = await page.locator("body").innerText();
+check("accueil en français", frHome.includes("Combien de jours me reste-t-il ?"));
+check("navigation traduite", frHome.includes("Accueil") && frHome.includes("Séjours"));
+check("calcul identique en français",
+  (await page.locator("main span").first().innerText()).trim() === "40");
+check("le français conserve les mêmes dates",
+  /04\.11\.2026/.test(frHome) && /70 jours/.test(frHome));
+
+await page.reload({ waitUntil: "networkidle" });
+await page.waitForTimeout(600);
+check("la langue survit au rechargement",
+  (await page.locator("body").innerText()).includes("Combien de jours me reste-t-il ?"));
+
+// retour à l'albanais
+await page.goto(`${BASE}/settings/`, { waitUntil: "networkidle" });
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: "Shqip" }).click();
+await page.waitForTimeout(500);
+check("retour à l'albanais",
+  (await page.locator("body").innerText()).includes("Cilësimet"));
+
+// ── Détection automatique depuis le navigateur ────────────────────────
+const frCtx = await browser.newContext({ locale: "fr-CH", viewport: { width: 390, height: 844 } });
+const frPage = await frCtx.newPage();
+await frPage.goto(BASE, { waitUntil: "networkidle" });
+await frPage.waitForTimeout(700);
+check("navigateur francophone → français automatiquement",
+  (await frPage.locator("body").innerText()).includes("Combien de jours me reste-t-il ?"));
+await frCtx.close();
+
+const sqCtx = await browser.newContext({ locale: "de-DE", viewport: { width: 390, height: 844 } });
+const sqPage = await sqCtx.newPage();
+await sqPage.goto(BASE, { waitUntil: "networkidle" });
+await sqPage.waitForTimeout(700);
+check("autre langue → albanais par défaut",
+  (await sqPage.locator("body").innerText()).includes("Sa ditë më kanë mbetur?"));
+await sqCtx.close();
+
 // ── Critère 5 ─────────────────────────────────────────────────────────
 check("aucune requête vers un domaine tiers", external.length === 0, external.join(", ") || "0 requête externe");
 

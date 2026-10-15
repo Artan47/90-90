@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { t } from "@/lib/i18n";
+import { useT } from "@/components/Store";
 
 interface InstallEvent extends Event {
   prompt: () => Promise<void>;
@@ -16,6 +16,7 @@ interface InstallEvent extends Event {
 export function InstallPrompt() {
   const [deferred, setDeferred] = useState<InstallEvent | null>(null);
   const [iosHint, setIosHint] = useState(false);
+  const t = useT();
 
   useEffect(() => {
     const standalone =

@@ -1,17 +1,17 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useStore } from "@/components/Store";
+import { useStore, useT } from "@/components/Store";
 import { StayForm, type StayDraft } from "@/components/StayForm";
 import { Badge, Button, Card, PageTitle } from "@/components/ui";
 import { getCountry, countsEver } from "@/lib/schengen-membership";
 import { countedDays, stayDays, validate } from "@/lib/schengen";
 import { compareDates, formatDate } from "@/lib/date";
 import type { Stay } from "@/lib/types";
-import { t, fill } from "@/lib/i18n";
+import { fill } from "@/lib/i18n";
 
 export default function StaysPage() {
-  const { stays, today, addStay, updateStay, removeStay, ready } = useStore();
+  const { stays, today, addStay, updateStay, removeStay, ready, t } = useStore();
   const [editing, setEditing] = useState<Stay | null>(null);
   const [adding, setAdding] = useState(false);
 
@@ -99,6 +99,7 @@ function StayRow({
   onDelete: () => void;
   onMarkExit: () => void;
 }) {
+  const t = useT();
   const country = getCountry(stay.country);
   const total = stayDays(stay, today);
   // Jours réellement imputés au quota : diffère du total si le pays n'était

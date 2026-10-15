@@ -1,4 +1,5 @@
 import type { IsoDate } from "./date";
+import type { Locale } from "./i18n";
 
 export type { IsoDate };
 
@@ -20,7 +21,8 @@ export interface Stay {
 export interface Profile {
   passportExpiry?: IsoDate;
   passportIssued?: IsoDate;
-  locale: "sq";
+  /** `null` = jamais choisie : on déduira la langue du navigateur. */
+  locale: Locale | null;
 }
 
 export interface AppData {
@@ -29,7 +31,7 @@ export interface AppData {
   profile: Profile;
 }
 
-export const DEFAULT_PROFILE: Profile = { locale: "sq" };
+export const DEFAULT_PROFILE: Profile = { locale: null };
 
 export function emptyData(): AppData {
   return { version: 1, stays: [], profile: { ...DEFAULT_PROFILE } };

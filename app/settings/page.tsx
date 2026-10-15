@@ -11,11 +11,13 @@ import {
   notificationSupport, requestNotifications, runReminders,
   type NotificationSupport,
 } from "@/lib/notifications";
-import { t, fill } from "@/lib/i18n";
+import { fill, LOCALE_LABELS, LOCALE_ORDER } from "@/lib/i18n";
 
 export default function SettingsPage() {
-  const { data, stays, today, ready, storageOk, setProfile, replaceAll, clearAll } =
-    useStore();
+  const {
+    data, stays, today, ready, storageOk, setProfile, replaceAll, clearAll,
+    t, locale, setLocale,
+  } = useStore();
   const [toast, setToast] = useState<string | null>(null);
   const [notif, setNotif] = useState<NotificationSupport>("default");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -55,6 +57,7 @@ export default function SettingsPage() {
         today,
         remaining: status.remaining,
         mustLeaveBy: status.mustLeaveBy,
+        locale,
       });
     }
   }
@@ -94,6 +97,26 @@ export default function SettingsPage() {
           </p>
         </Card>
       ) : null}
+
+      <Card className="space-y-2">
+        <h2 className="font-bold">{t.common.language}</h2>
+        <div className="grid grid-cols-2 gap-2">
+          {LOCALE_ORDER.map((code) => (
+            <button
+              key={code}
+              onClick={() => setLocale(code)}
+              aria-pressed={locale === code}
+              className={`rounded-xl px-3 py-3 text-sm font-semibold transition-colors ${
+                locale === code
+                  ? "bg-[var(--text)] text-[var(--bg)]"
+                  : "border border-[var(--border)]"
+              }`}
+            >
+              {LOCALE_LABELS[code]}
+            </button>
+          ))}
+        </div>
+      </Card>
 
       <Card className="space-y-3">
         <h2 className="font-bold">{t.settings.passport}</h2>

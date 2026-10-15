@@ -3,13 +3,15 @@
 import { Card, PageTitle } from "@/components/ui";
 import { COUNTRIES, LAST_VERIFIED, SCHENGEN_STATE_COUNT } from "@/lib/schengen-membership";
 import { formatDate } from "@/lib/date";
-import { t, fill } from "@/lib/i18n";
+import { fill } from "@/lib/i18n";
+import { useT } from "@/components/Store";
 
 const EES_URL = "https://travel-europe.europa.eu/ees/check-how-long-you-can-stay";
 const CALC_URL =
   "https://home-affairs.ec.europa.eu/policies/schengen-borders-and-visa/border-crossing/schengen-calculator_en";
 
 export default function AboutPage() {
+  const t = useT();
   const members = COUNTRIES.filter((c) => c.since !== null);
   // On ne montre que les cas contre-intuitifs : ceux que l'on croit à tort
   // dans Schengen. Les pays tiers évidents n'ont pas besoin d'explication.

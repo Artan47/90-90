@@ -4,9 +4,12 @@
  * ⚠️ RELECTURE NÉCESSAIRE : ces libellés sont une proposition de départ, ils
  * n'ont pas été validés par un locuteur natif.
  *
+ * C'est la LANGUE DE RÉFÉRENCE : le type `Messages` en est dérivé, donc
+ * toute clé ajoutée ici doit être traduite dans les autres fichiers, sinon
+ * le projet ne compile plus.
+ *
  * Pour ajouter une langue : dupliquer ce fichier (par ex. `sr.ts`), traduire
  * les valeurs sans toucher aux clés, puis l'enregistrer dans `index.ts`.
- * Le type `Messages` garantit qu'aucune clé ne peut manquer.
  */
 
 const sq = {
@@ -184,6 +187,11 @@ const sq = {
     OVER_90: "Kuota e tejkaluar",
   },
 
+  notifications: {
+    under7: "Të kanë mbetur vetëm {n} ditë nga 90.",
+    under15: "Të kanë mbetur {n} ditë nga 90.",
+  },
+
   common: {
     today: "Sot",
     yes: "Po",
@@ -196,8 +204,9 @@ const sq = {
     to: "deri më",
     install: "Instalo aplikacionin",
     installHint: "Shtoje në ekranin bazë për ta hapur si aplikacion, edhe pa internet.",
+    language: "Gjuha",
   },
-} as const;
+};
 
 export type Messages = typeof sq;
 export default sq;

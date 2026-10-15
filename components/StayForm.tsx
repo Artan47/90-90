@@ -5,7 +5,7 @@ import type { Stay } from "@/lib/types";
 import { Button, DateInput, Field, Select, TextInput, Toggle } from "@/components/ui";
 import { countriesForPicker } from "@/lib/schengen-membership";
 import { isIsoDate, isBefore } from "@/lib/date";
-import { t } from "@/lib/i18n";
+import { useT } from "@/components/Store";
 
 export type StayDraft = Omit<Stay, "id">;
 
@@ -29,6 +29,7 @@ export function StayForm({
   const [note, setNote] = useState(initial?.note ?? "");
   const [exempt, setExempt] = useState(Boolean(initial?.exempt));
   const [error, setError] = useState<string | null>(null);
+  const t = useT();
 
   const countries = countriesForPicker();
 

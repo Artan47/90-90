@@ -10,10 +10,10 @@ import { statusOn, MAX_DAYS, currentStay } from "@/lib/schengen";
 import { formatDate, diffDays, todayIso } from "@/lib/date";
 import { runReminders } from "@/lib/notifications";
 import { InstallPrompt } from "@/components/InstallPrompt";
-import { t, fill } from "@/lib/i18n";
+import { fill } from "@/lib/i18n";
 
 export default function HomePage() {
-  const { stays, today, ready, addStay, updateStay } = useStore();
+  const { stays, today, ready, addStay, updateStay, t, locale } = useStore();
   const [toast, setToast] = useState<string | null>(null);
 
   const status = useMemo(() => statusOn(stays, today), [stays, today]);
@@ -27,8 +27,9 @@ export default function HomePage() {
       today,
       remaining: status.remaining,
       mustLeaveBy: status.mustLeaveBy,
+      locale,
     });
-  }, [ready, today, status.remaining, status.mustLeaveBy]);
+  }, [ready, today, status.remaining, status.mustLeaveBy, locale]);
 
   const overstay = status.issues.find((i) => i.code === "OVER_90");
   const tone = toneFor(status.remaining, status.compliant);

@@ -6,12 +6,12 @@ import { Button, Card, DateInput, Field, PageTitle, Select, Toast } from "@/comp
 import { maxStayFrom, simulate, remainingOn, earliestReentry } from "@/lib/schengen";
 import { countriesForPicker } from "@/lib/schengen-membership";
 import { formatDate, isIsoDate, isBefore, inclusiveDays, addDays } from "@/lib/date";
-import { t, fill } from "@/lib/i18n";
+import { fill } from "@/lib/i18n";
 
 type Mode = "enter" | "range";
 
 export default function PlanPage() {
-  const { stays, today, addStay, ready } = useStore();
+  const { stays, today, addStay, ready, t } = useStore();
   const [mode, setMode] = useState<Mode>("enter");
   const [entry, setEntry] = useState(today);
   const [exit, setExit] = useState("");

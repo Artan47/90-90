@@ -11,7 +11,7 @@
 
 import type { IsoDate } from "./date";
 import { diffDays, formatDate } from "./date";
-import { t, fill } from "./i18n";
+import { fill, getMessages, DEFAULT_LOCALE, type Locale, type Messages } from "./i18n";
 
 const SEEN_KEY = "sa-dite:notified:v1";
 
@@ -56,6 +56,8 @@ export interface ReminderInput {
   today: IsoDate;
   remaining: number;
   mustLeaveBy: IsoDate | null;
+  /** Langue des rappels ; l'albanais par défaut. */
+  locale?: Locale;
 }
 
 /**
@@ -67,18 +69,19 @@ export function dueReminders(
 ): Array<{ key: string; title: string; body: string }> {
   const out: Array<{ key: string; title: string; body: string }> = [];
   const { today, remaining, mustLeaveBy } = input;
+  const t: Messages = getMessages(input.locale ?? DEFAULT_LOCALE);
 
   if (remaining < 7) {
     out.push({
       key: `lt7:${today}`,
       title: t.appName,
-      body: fill("Të kanë mbetur vetëm {n} ditë nga 90.", { n: remaining }),
+      body: fill(t.notifications.under7, { n: remaining }),
     });
   } else if (remaining < 15) {
     out.push({
       key: `lt15:${today}`,
       title: t.appName,
-      body: fill("Të kanë mbetur {n} ditë nga 90.", { n: remaining }),
+      body: fill(t.notifications.under15, { n: remaining }),
     });
   }
 

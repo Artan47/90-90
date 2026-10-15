@@ -4,8 +4,9 @@ Application web installable (PWA) qui calcule les jours restants dans l'espace
 Schengen selon la règle **90 jours sur toute période de 180 jours**, pour des
 ressortissants du Kosovo qui font des allers-retours fréquents.
 
-Interface entièrement en **albanais (shqip)**. Aucun compte, aucun serveur,
-**aucune donnée ne quitte l'appareil**.
+Interface en **albanais (shqip)** et en **français**, changeable à tout moment
+dans les réglages. Aucun compte, aucun serveur, **aucune donnée ne quitte
+l'appareil**.
 
 ---
 
@@ -131,7 +132,9 @@ lib/
   storage.ts               localStorage tolérant aux pannes + export/import JSON
   notifications.ts         Rappels locaux (aucun serveur, aucun push distant)
   types.ts                 Stay, Profile, AppData
-  i18n/sq.ts               Toutes les chaînes, en albanais
+  i18n/sq.ts               Toutes les chaînes, en albanais (langue de référence)
+  i18n/fr.ts               Traduction française
+  i18n/index.ts            Registre des langues, détection, jetons {x}
 app/
   page.tsx                 Écran 1 — « Sa ditë më kanë mbetur? »
   stays/                   Écran 2 — « Qëndrimet e mia »
@@ -247,11 +250,29 @@ npm run build   # produit out/
 Servir `out/` en HTTPS — le service worker et l'installation sur l'écran
 d'accueil l'exigent.
 
-## Traduction
+## Langues
 
-Toutes les chaînes sont dans `lib/i18n/sq.ts`. Pour ajouter une langue :
-dupliquer ce fichier, traduire les valeurs sans toucher aux clés, l'importer
-dans `lib/i18n/index.ts`. Le type `Messages` garantit qu'aucune clé ne manque.
+L'application est disponible en **albanais** et en **français**. La langue se
+change dans **Réglages → Langue / Gjuha**, et le choix est conservé.
 
-> ⚠️ Les libellés albanais actuels sont une **proposition de départ** et doivent
-> être relus par un locuteur natif.
+Au premier lancement, la langue est déduite du navigateur : `fr-*` donne le
+français, tout le reste donne l'albanais, qui est la langue des utilisateurs
+visés.
+
+### Ajouter une langue
+
+L'albanais (`lib/i18n/sq.ts`) est la **langue de référence** : le type
+`Messages` en est dérivé, donc une clé oubliée ailleurs casse la compilation.
+
+1. Dupliquer `lib/i18n/sq.ts` (par ex. `sr.ts`) et traduire les **valeurs**,
+   sans toucher aux clés ni aux jetons `{n}`, `{date}`.
+2. L'ajouter à `LOCALES`, `LOCALE_LABELS` et `LOCALE_ORDER` dans
+   `lib/i18n/index.ts`, et au type `Locale`.
+3. Compléter `detectLocale()` si la langue doit être détectée automatiquement.
+4. `npm test` — `lib/i18n/i18n.test.ts` vérifie que toutes les langues ont
+   exactement les mêmes clés, aucune valeur vide, et les mêmes jetons `{x}`
+   dans chaque libellé.
+
+> ⚠️ Les libellés albanais sont une **proposition de départ** et doivent être
+> relus par un locuteur natif. Ils sont tous dans un seul fichier : la
+> relecture ne touche aucun code.

@@ -14,10 +14,19 @@ import type { AppData, Profile, Stay } from "@/lib/types";
 import { emptyData } from "@/lib/types";
 import { loadData, saveData, newId, isStorageAvailable } from "@/lib/storage";
 import { todayIso, type IsoDate } from "@/lib/date";
+import {
+  detectLocale, getMessages, DEFAULT_LOCALE,
+  type Locale, type Messages,
+} from "@/lib/i18n";
 
 interface StoreValue {
   data: AppData;
   today: IsoDate;
+  /** Langue effective : celle choisie, sinon celle du navigateur. */
+  locale: Locale;
+  setLocale: (locale: Locale) => void;
+  /** Libellés de la langue effective. */
+  t: Messages;
   ready: boolean;
   storageOk: boolean;
   stays: Stay[];
@@ -36,6 +45,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [storageOk, setStorageOk] = useState(true);
   const [today, setToday] = useState<IsoDate>(() => todayIso());
+  // La détection ne peut avoir lieu qu'au montage : le rendu serveur et la
+  // première passe client doivent produire le même HTML.
+  const [detected, setDetected] = useState<Locale>(DEFAULT_LOCALE);
 
   // Chargement au montage seulement : localStorage n'existe pas au rendu
   // serveur, et l'hydratation doit partir du même état vide.
@@ -43,6 +55,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     setData(loadData());
     setStorageOk(isStorageAvailable());
     setToday(todayIso());
+    setDetected(detectLocale());
     setReady(true);
   }, []);
 
@@ -65,6 +78,15 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     saveData(next);
   }, []);
 
+  const locale: Locale = data.profile.locale ?? detected;
+  const messages = getMessages(locale);
+
+  // `lang` doit refléter la langue affichée : lecteurs d'écran, correction
+  // orthographique et césure s'appuient dessus.
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
+
   const value = useMemo<StoreValue>(() => {
     const addStay = (stay: Omit<Stay, "id">): Stay => {
       const created: Stay = { ...stay, id: newId() };
@@ -75,6 +97,10 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return {
       data,
       today,
+      locale,
+      setLocale: (next: Locale) =>
+        persist({ ...data, profile: { ...data.profile, locale: next } }),
+      t: messages,
       ready,
       storageOk,
       stays: data.stays,
@@ -91,13 +117,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       replaceAll: (next) => persist(next),
       clearAll: () => persist(emptyData()),
     };
-  }, [data, today, ready, storageOk, persist]);
+  }, [data, today, locale, messages, ready, storageOk, persist]);
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
 }
 
 export function useStore(): StoreValue {
   const ctx = useContext(StoreContext);
-  if (!ctx) throw new Error("useStore duhet përdorur brenda StoreProvider");
+  if (!ctx) throw new Error("useStore must be used inside StoreProvider");
   return ctx;
+}
+
+/**
+ * Libellés de la langue courante.
+ *
+ * À utiliser partout dans l'interface : contrairement à l'export statique
+ * `t` de lib/i18n, ce hook re-rend le composant au changement de langue.
+ */
+export function useT(): Messages {
+  return useStore().t;
 }

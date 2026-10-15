@@ -38,6 +38,14 @@ describe("rappels locaux — quels seuils déclenchent", () => {
     ).toHaveLength(0);
   });
 
+  it("les rappels suivent la langue choisie", () => {
+    const sq = dueReminders({ ...base, remaining: 5 })[0]!;
+    const fr = dueReminders({ ...base, remaining: 5, locale: "fr" })[0]!;
+    expect(sq.body).toContain("ditë");
+    expect(fr.body).toContain("jours");
+    expect(fr.key).toBe(sq.key); // la clé de déduplication ne dépend pas de la langue
+  });
+
   it("les clés changent chaque jour pour ne pas spammer", () => {
     const a = dueReminders({ ...base, remaining: 5 })[0]!;
     const b = dueReminders({ ...base, today: "2026-08-28", remaining: 5 })[0]!;

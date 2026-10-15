@@ -2,18 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { t } from "@/lib/i18n";
-
-const ITEMS = [
-  { href: "/", label: t.nav.home, icon: "◎" },
-  { href: "/stays", label: t.nav.stays, icon: "≡" },
-  { href: "/plan", label: t.nav.plan, icon: "✈" },
-  { href: "/timeline", label: t.nav.timeline, icon: "▤" },
-  { href: "/settings", label: t.nav.settings, icon: "⚙" },
-] as const;
+import { useT } from "@/components/Store";
 
 export function Nav() {
   const pathname = usePathname();
+  const t = useT();
+
+  // Construite dans le composant, et non au niveau du module : les libellés
+  // doivent changer avec la langue.
+  const items = [
+    { href: "/", label: t.nav.home, icon: "◎" },
+    { href: "/stays", label: t.nav.stays, icon: "≡" },
+    { href: "/plan", label: t.nav.plan, icon: "✈" },
+    { href: "/timeline", label: t.nav.timeline, icon: "▤" },
+    { href: "/settings", label: t.nav.settings, icon: "⚙" },
+  ];
 
   return (
     <nav
@@ -22,7 +25,7 @@ export function Nav() {
       aria-label={t.appName}
     >
       <ul className="mx-auto flex w-full max-w-lg">
-        {ITEMS.map((item) => {
+        {items.map((item) => {
           const active =
             item.href === "/"
               ? pathname === "/"

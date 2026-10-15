@@ -13,6 +13,7 @@
 import type { AppData, Stay } from "./types";
 import { emptyData } from "./types";
 import { isIsoDate } from "./date";
+import { isLocale } from "./i18n";
 
 const KEY = "sa-dite:v1";
 
@@ -72,6 +73,7 @@ export function parseData(raw: unknown): AppData {
   const profile = { ...base.profile };
   if (isIsoDate(profileRaw.passportExpiry)) profile.passportExpiry = profileRaw.passportExpiry;
   if (isIsoDate(profileRaw.passportIssued)) profile.passportIssued = profileRaw.passportIssued;
+  if (isLocale(profileRaw.locale)) profile.locale = profileRaw.locale;
 
   return { version: 1, stays, profile };
 }
