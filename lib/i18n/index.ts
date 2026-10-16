@@ -24,6 +24,17 @@ export const LOCALE_LABELS: Record<Locale, string> = {
 
 export const LOCALE_ORDER: readonly Locale[] = ["sq", "fr"];
 
+/**
+ * Langue d'ouverture, pour tout le monde.
+ *
+ * L'application est destinée à des Albanophones : elle s'ouvre en albanais
+ * quelle que soit la langue du téléphone. On ne déduit PLUS la langue du
+ * navigateur — un proche dont le téléphone est en français ou en allemand
+ * doit quand même arriver sur une interface albanaise.
+ *
+ * Deux moyens d'en changer : le sélecteur des réglages, dont le choix est
+ * conservé, ou « ?lang=fr » dans l'adresse du lien envoyé.
+ */
 export const DEFAULT_LOCALE: Locale = "sq";
 
 export function isLocale(value: unknown): value is Locale {
@@ -35,21 +46,25 @@ export function getMessages(locale: Locale = DEFAULT_LOCALE): Messages {
 }
 
 /**
- * Langue à utiliser au premier lancement, déduite du navigateur.
- * Tout ce qui n'est pas clairement du français retombe sur l'albanais :
- * c'est la langue des utilisateurs visés.
+ * Langue imposée par l'adresse, via « ?lang=sq » ou « ?lang=fr ».
+ *
+ * Permet d'envoyer un lien qui s'ouvre d'emblée dans la bonne langue,
+ * sans dépendre des réglages du téléphone de celui qui le reçoit :
+ *   https://www.sadite.ch/?lang=sq
+ *
+ * Le choix est ensuite conservé comme si la personne l'avait fait
+ * elle-même dans les réglages.
  */
-export function detectLocale(
-  languages: readonly string[] = typeof navigator !== "undefined"
-    ? navigator.languages ?? [navigator.language]
-    : [],
-): Locale {
-  for (const lang of languages) {
-    const code = lang.toLowerCase();
-    if (code.startsWith("sq")) return "sq";
-    if (code.startsWith("fr")) return "fr";
+export function localeFromUrl(search?: string): Locale | null {
+  const query =
+    search ?? (typeof window === "undefined" ? "" : window.location.search);
+  if (!query) return null;
+  try {
+    const value = new URLSearchParams(query).get("lang");
+    return isLocale(value) ? value : null;
+  } catch {
+    return null;
   }
-  return DEFAULT_LOCALE;
 }
 
 /**

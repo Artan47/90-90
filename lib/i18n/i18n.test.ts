@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   fill, getMessages, t, DEFAULT_LOCALE, LOCALES, LOCALE_LABELS,
-  LOCALE_ORDER, isLocale, detectLocale, type Locale,
+  LOCALE_ORDER, isLocale, localeFromUrl, type Locale,
 } from "./index";
 
 /** Chemins de toutes les feuilles d'un objet de messages. */
@@ -84,6 +84,26 @@ describe("i18n — parité des langues", () => {
   });
 });
 
+describe("i18n — langue imposée par l'adresse", () => {
+  it("reconnaît ?lang=sq et ?lang=fr", () => {
+    expect(localeFromUrl("?lang=sq")).toBe("sq");
+    expect(localeFromUrl("?lang=fr")).toBe("fr");
+    expect(localeFromUrl("lang=fr")).toBe("fr");
+    expect(localeFromUrl("?autre=1&lang=sq&x=2")).toBe("sq");
+  });
+
+  it("ignore une langue inconnue ou absente", () => {
+    expect(localeFromUrl("?lang=de")).toBeNull();
+    expect(localeFromUrl("?lang=")).toBeNull();
+    expect(localeFromUrl("?autre=1")).toBeNull();
+    expect(localeFromUrl("")).toBeNull();
+  });
+
+  it("ne plante pas sur une adresse absurde", () => {
+    expect(localeFromUrl("?%%%")).toBeNull();
+  });
+});
+
 describe("i18n — détection et validation", () => {
   it("reconnaît les codes valides", () => {
     expect(isLocale("sq")).toBe(true);
@@ -93,18 +113,11 @@ describe("i18n — détection et validation", () => {
     expect(isLocale(42)).toBe(false);
   });
 
-  it("déduit la langue du navigateur", () => {
-    expect(detectLocale(["fr-CH", "en"])).toBe("fr");
-    expect(detectLocale(["sq-XK"])).toBe("sq");
-    expect(detectLocale(["FR"])).toBe("fr");
-    // La première langue reconnue l'emporte.
-    expect(detectLocale(["sq", "fr"])).toBe("sq");
-    expect(detectLocale(["fr", "sq"])).toBe("fr");
-  });
-
-  it("retombe sur l'albanais pour toute autre langue", () => {
-    expect(detectLocale(["de-CH", "it"])).toBe("sq");
-    expect(detectLocale([])).toBe("sq");
+  it("s'ouvre en albanais pour tout le monde", () => {
+    // Plus de détection par navigateur : un téléphone en français ou en
+    // allemand doit quand même arriver sur l'interface albanaise.
+    expect(DEFAULT_LOCALE).toBe("sq");
+    expect(getMessages().home.title).toBe("Sa ditë më kanë mbetur?");
   });
 });
 

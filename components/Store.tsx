@@ -32,7 +32,8 @@ import {
 } from "@/lib/storage";
 import { todayIso, type IsoDate } from "@/lib/date";
 import {
-  detectLocale, getMessages, fill, DEFAULT_LOCALE, type Locale, type Messages,
+  getMessages, fill, localeFromUrl, DEFAULT_LOCALE,
+  type Locale, type Messages,
 } from "@/lib/i18n";
 
 export type AuthResult =
@@ -82,7 +83,6 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [storageOk, setStorageOk] = useState(true);
   const [today, setToday] = useState<IsoDate>(() => todayIso());
-  const [detected, setDetected] = useState<Locale>(DEFAULT_LOCALE);
 
   /** Contenu déchiffré du compte connecté — jamais écrit en clair. */
   const [content, setContent] = useState<AccountContent | null>(null);
@@ -90,11 +90,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [key, setKey] = useState<CryptoKey | null>(null);
 
   useEffect(() => {
-    const detectedLocale = detectLocale();
-    setDetected(detectedLocale);
-    // La langue DÉJÀ enregistrée l'emporte sur celle du navigateur.
-    const defaultName = getMessages(peekLocale() ?? detectedLocale).people.defaultName;
-    const loaded = loadData(defaultName);
+    // « ?lang=sq » dans l'adresse l'emporte sur tout le reste : c'est une
+    // consigne explicite de celui qui a envoyé le lien. Vient ensuite la
+    // langue déjà enregistrée, puis celle du navigateur.
+    const forced = localeFromUrl();
+    const resolved = forced ?? peekLocale() ?? DEFAULT_LOCALE;
+    const defaultName = getMessages(resolved).people.defaultName;
+    const base = loadData(defaultName);
+    const loaded = forced ? { ...base, locale: forced } : base;
     setData(loaded);
     setStorageOk(isStorageAvailable());
     setToday(todayIso());
@@ -144,7 +147,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     saveData(next);
   }, []);
 
-  const locale: Locale = data.locale ?? detected;
+  const locale: Locale = data.locale ?? DEFAULT_LOCALE;
   const messages = getMessages(locale);
   const account = activeAccount(data);
   const signedIn = account !== null && content !== null;

@@ -560,13 +560,25 @@ check("retour à l'albanais",
   (await page.locator("body").innerText()).includes("Cilësimet"));
 
 // ── Détection automatique depuis le navigateur ────────────────────────
+// Un navigateur francophone doit quand même ouvrir en ALBANAIS : l'app
+// est destinée à des albanophones, la langue du téléphone ne décide pas.
 const frCtx = await browser.newContext({ locale: "fr-CH", viewport: { width: 390, height: 844 } });
 const frPage = await frCtx.newPage();
 await frPage.goto(BASE, { waitUntil: "networkidle" });
 await frPage.waitForTimeout(700);
 const frText2 = await frPage.locator("body").innerText();
-check("navigateur francophone → français automatiquement",
-  frText2.includes("Créer un compte") && frText2.includes("Mot de passe"));
+check("navigateur francophone → ouvre quand même en albanais",
+  frText2.includes("Krijo llogari") && frText2.includes("Fjalëkalimi"));
+
+// …sauf si le lien impose explicitement une langue.
+await frPage.goto(`${BASE}?lang=fr`, { waitUntil: "networkidle" });
+await frPage.waitForTimeout(800);
+check("?lang=fr ouvre en français",
+  (await frPage.locator("body").innerText()).includes("Créer un compte"));
+await frPage.goto(`${BASE}?lang=sq`, { waitUntil: "networkidle" });
+await frPage.waitForTimeout(800);
+check("?lang=sq ouvre en albanais",
+  (await frPage.locator("body").innerText()).includes("Krijo llogari"));
 await frCtx.close();
 
 const sqCtx = await browser.newContext({ locale: "de-DE", viewport: { width: 390, height: 844 } });
@@ -574,7 +586,7 @@ const sqPage = await sqCtx.newPage();
 await sqPage.goto(BASE, { waitUntil: "networkidle" });
 await sqPage.waitForTimeout(700);
 const sqText2 = await sqPage.locator("body").innerText();
-check("autre langue → albanais par défaut",
+check("navigateur germanophone → albanais",
   sqText2.includes("Krijo llogari") && sqText2.includes("Fjalëkalimi"));
 await sqCtx.close();
 
